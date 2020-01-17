@@ -189,11 +189,12 @@ impl PPU {
                             if self.sprite_count < 8 {
                                 let off = self.sprite_count as usize * 4;
                                 self.scanline_sprites[off..off+4].clone_from_slice(&entry.to_bytes());
-                                self.sprite_count += 1;
                             }
+                            self.sprite_count += 1;
                         }
                     }
                     chr.registers_mut().ppu_status |= if self.sprite_count > 8 { 0x20 } else { 0 };
+                    if self.sprite_count > 8 {self.sprite_count = 8}
                 }
 
                 if self.dot == 340 {
@@ -223,7 +224,7 @@ impl PPU {
                             } else { 
                                 7 - (self.scanline - entry.y as u16) & 0x07
                             };
-                            let table_addr = (entry.attr as u16 & 0x01) << 12;
+                            let table_addr = ((entry.tile_id & 0x01) as u16) << 12;
                             let mut top_tile_id = entry.tile_id & 0xFE;
                             let mut bottom_tile_id = (entry.tile_id & 0xFE) + 1;
                             if entry.attr & 0x80 != 0 { std::mem::swap(&mut top_tile_id, &mut bottom_tile_id) };

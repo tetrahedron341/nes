@@ -1,3 +1,4 @@
+#[derive(Debug)]
 pub struct PPURegisters {
     pub ppu_ctrl: u8,
     pub ppu_mask: u8,

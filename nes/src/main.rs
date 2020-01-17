@@ -61,6 +61,21 @@ impl<'a> nes_core::ppu::VideoInterface for Screen<'a> {
     }
 }
 
+struct DebugScreen<'a> {
+    pt1: sdl2::render::Texture<'a>,
+    pt2: sdl2::render::Texture<'a>,
+}
+
+impl<'a> DebugScreen<'a> {
+    fn new<T>(tc: &'a sdl2::render::TextureCreator<T>) -> Result<Self, Box<dyn std::error::Error>> {
+        let pt1 = tc.create_texture_streaming(sdl2::pixels::PixelFormatEnum::RGB24, 128,128)?;
+        let pt2 = tc.create_texture_streaming(sdl2::pixels::PixelFormatEnum::RGB24, 128,128)?;
+        Ok(DebugScreen {
+            pt1,pt2
+        })
+    }
+}
+
 struct Controller {
     buttons: RwLock<ControllerState>
 }
@@ -117,11 +132,15 @@ fn main() {
     let mut selected_palette = 0;
     let mut paused = false;
 
-    let mut update_debug = true;
+    let mut debug_screen = DebugScreen::new(&tc).unwrap();
+    let mut update_debug = false;
 
     let mut fps_count = 0;
     let mut fps_timer = std::time::SystemTime::now();
     let mut fps: f64;
+
+    canvas.set_draw_color((0,0,255));
+    canvas.clear();
 
     'running: loop {
         let frame_start_time = std::time::SystemTime::now();
@@ -133,9 +152,6 @@ fn main() {
                 Event::KeyDown {keycode: Some(Keycode::R), keymod: sdl2::keyboard::Mod::LCTRLMOD, ..} |
                 Event::KeyDown {keycode: Some(Keycode::R), keymod: sdl2::keyboard::Mod::RCTRLMOD, ..} => {
                     nes.cpu.reset();
-                },
-                Event::KeyDown {keycode: Some(Keycode::U), ..} => {
-                    update_debug = true;
                 },
                 Event::KeyDown {keycode: Some(Keycode::P), ..} => {
                     paused = !paused;
@@ -152,6 +168,9 @@ fn main() {
                 },
                 Event::KeyDown {keycode: Some(Keycode::O), ..} => {
                     println!("{}", nes.ppu.print_oam());
+                },
+                Event::KeyDown {keycode: Some(Keycode::R), ..} => {
+                    println!("{:?}", nes.mmu.ppu_registers);
                 },
 
                 Event::KeyDown {keycode: Some(Keycode::Z), ..} => {
@@ -233,40 +252,86 @@ fn main() {
                 ).unwrap();
             }
         }
-
-        if update_debug {
-            canvas.set_draw_color((0,0,255));
-            canvas.fill_rect(Rect::new(GAME_WIDTH as i32, 0, DEBUG_WIDTH, GAME_HEIGHT)).unwrap();
-
-            // Draw the pattern table
+        if !paused || update_debug {
+            // Update the debug screen
             let pattern_table = nes.pattern_table();
-            let table_left = &pattern_table[0..0x1000];
-            let table_right = &pattern_table[0x1000..0x2000];
+            let palette = nes.get_palette(selected_palette);
+            debug_screen.pt1.with_lock(None, |buf, pitch| {
+                for tr in 0..16 {
+                    for tc in 0..16 {
+                        let tile_addr = (tr << 8) | (tc << 4);
+                        let bp_hi = &pattern_table[tile_addr + 8 .. tile_addr + 16];
+                        let bp_lo = &pattern_table[tile_addr + 0 .. tile_addr + 8];
+                        for y in 0..8 {
+                            let byte_hi = bp_hi[y];
+                            let byte_lo = bp_lo[y];
+                            for x in 0..8 {
+                                let mask = 0x80 >> x;
+                                let px_hi = (byte_hi & mask) >> (7-x);
+                                let px_lo = (byte_lo & mask) >> (7-x);
+                                let px = (px_hi << 1) | px_lo;
+                                let (r,g,b) = palette[px as usize];
 
-            const PATTERN_X: i32 = GAME_WIDTH as i32 + 15;
-            const PATTERN_Y: i32 = 15;
-
-            draw_pattern_table(&mut canvas, table_left, &nes.get_palette(selected_palette), PATTERN_X, PATTERN_Y, PIXEL_SCALE);
-            draw_pattern_table(&mut canvas, table_right, &nes.get_palette(selected_palette), PATTERN_X+128*PIXEL_SCALE as i32+15, PATTERN_Y, PIXEL_SCALE);
-
-            // Draw the palette selector
-            const PALETTE_X: i32 = PATTERN_X;
-            const PALETTE_Y: i32 = PATTERN_Y + (128 * PIXEL_SCALE as i32) + 15;
-            const PALETTE_SCALE: u32 = PIXEL_SCALE * 4;
-            for pi in 0..8 {
-                let offset_x = PALETTE_X + pi as i32 * ((4*PALETTE_SCALE as i32) + 5);
-                if pi == selected_palette {
-                    canvas.set_draw_color((255,255,255));
-                    canvas.fill_rect(Rect::new(offset_x-1, PALETTE_Y-1, 4*PALETTE_SCALE + 2, PALETTE_SCALE + 2)).unwrap();
+                                let ty = (tr*8) + y;
+                                let tx = (tc*8) + x;
+                                buf[(ty*pitch + tx*3) + 0] = r;
+                                buf[(ty*pitch + tx*3) + 1] = g;
+                                buf[(ty*pitch + tx*3) + 2] = b;
+                            }
+                        }
+                    }
                 }
-                for i in 0..4 {
-                    canvas.set_draw_color(nes.get_palette(pi)[i as usize]);
-                    canvas.fill_rect(Rect::new(offset_x + i*PALETTE_SCALE as i32, PALETTE_Y, PALETTE_SCALE, PALETTE_SCALE)).unwrap();
-                }
-            }
+            }).unwrap();
+            debug_screen.pt2.with_lock(None, |buf, pitch| {
+                for tr in 0..16 {
+                    for tc in 0..16 {
+                        let tile_addr = 0x1000 | (tr << 8) | (tc << 4);
+                        let bp_hi = &pattern_table[tile_addr + 8 .. tile_addr + 16];
+                        let bp_lo = &pattern_table[tile_addr + 0 .. tile_addr + 8];
+                        for y in 0..8 {
+                            let byte_hi = bp_hi[y];
+                            let byte_lo = bp_lo[y];
+                            for x in 0..8 {
+                                let mask = 0x80 >> x;
+                                let px_hi = (byte_hi & mask) >> (7-x);
+                                let px_lo = (byte_lo & mask) >> (7-x);
+                                let px = (px_hi << 1) | px_lo;
+                                let (r,g,b) = palette[px as usize];
 
+                                let ty = (tr*8) + y;
+                                let tx = (tc*8) + x;
+                                buf[(ty*pitch + tx*3) + 0] = r;
+                                buf[(ty*pitch + tx*3) + 1] = g;
+                                buf[(ty*pitch + tx*3) + 2] = b;
+                            }
+                        }
+                    }
+                }
+            }).unwrap();
             update_debug = false;
         }
+
+        // Draw the palette selector
+        const PALETTE_X: i32 = GAME_WIDTH as i32 + 15;
+        const PALETTE_Y: i32 = 15 + (128 * PIXEL_SCALE as i32) + 15;
+        const PALETTE_SCALE: u32 = PIXEL_SCALE * 4;
+        for pi in 0..8 {
+            let offset_x = PALETTE_X + pi as i32 * ((4*PALETTE_SCALE as i32) + 5);
+            if pi == selected_palette {
+                canvas.set_draw_color((255,255,255));
+                canvas.fill_rect(Rect::new(offset_x-1, PALETTE_Y-1, 4*PALETTE_SCALE + 2, PALETTE_SCALE + 2)).unwrap();
+            } else {
+                canvas.set_draw_color((0,0,255));
+                canvas.fill_rect(Rect::new(offset_x-1, PALETTE_Y-1, 4*PALETTE_SCALE + 2, PALETTE_SCALE + 2)).unwrap();
+            }
+            for i in 0..4 {
+                canvas.set_draw_color(nes.get_palette(pi)[i as usize]);
+                canvas.fill_rect(Rect::new(offset_x + i*PALETTE_SCALE as i32, PALETTE_Y, PALETTE_SCALE, PALETTE_SCALE)).unwrap();
+            }
+        }
+
+        canvas.copy(&debug_screen.pt1, None, Rect::new(GAME_WIDTH as i32 + 15                         , 15, 128*PIXEL_SCALE, 128*PIXEL_SCALE)).unwrap();
+        canvas.copy(&debug_screen.pt2, None, Rect::new(GAME_WIDTH as i32 + 128*PIXEL_SCALE as i32 + 30, 15, 128*PIXEL_SCALE, 128*PIXEL_SCALE)).unwrap();
 
         canvas.present();
         fps_count += 1;
@@ -278,40 +343,5 @@ fn main() {
             canvas.window_mut().set_title(&format!("{}: {}x{} FPS: {:.2} {}", TITLE, GAME_WIDTH + DEBUG_WIDTH, GAME_HEIGHT, fps, if paused {"Paused"} else {""})).unwrap();
         }
         std::thread::sleep(std::time::Duration::from_micros(1_000_000 / 60).checked_sub(frame_start_time.elapsed().unwrap()).unwrap_or_default())
-    }
-}
-
-fn draw_pattern_table(
-    canvas: &mut sdl2::render::Canvas<sdl2::video::Window>, 
-    pattern_table: &[u8], 
-    palette: &[(u8,u8,u8)],
-    start_x: i32,
-    start_y: i32, 
-    scale: u32
-) {
-    for ty in 0..16usize {
-        for tx in 0..16usize {
-            let tile_addr = ty<<8 | tx<<4;
-            let bp_upper = &pattern_table[tile_addr | 0x8 ..= tile_addr | 0xf];
-            let bp_lower = &pattern_table[tile_addr | 0x0 ..= tile_addr | 0x7];
-            for y in 0..8 {
-                let byte_upper = bp_upper[y as usize];
-                let byte_lower = bp_lower[y as usize];
-                for x in 0..8 {
-                    let bit_mask = 0x80 >> x;
-                    let bit_high = (byte_upper & bit_mask) >> (7-x);
-                    let bit_low = (byte_lower & bit_mask) >> (7-x);
-                    let palette_select = (bit_high<<1) | bit_low;
-
-                    // TODO: Use palette colors in debug pattern table display
-                    let color: (u8,u8,u8) = palette[palette_select as usize];
-
-                    canvas.set_draw_color(color);
-                    let offset_x = (8*tx as i32+x) * scale as i32;
-                    let offset_y = (8*ty as i32+y) * scale as i32;
-                    canvas.fill_rect(Rect::new(start_x+offset_x, start_y+offset_y, scale, scale)).unwrap();
-                }
-            }
-        }
     }
 }

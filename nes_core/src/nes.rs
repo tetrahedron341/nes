@@ -124,6 +124,16 @@ impl<'a, V: VideoInterface, C: NESController> Nes<V,C> {
         }
         out
     }
+
+    pub fn palette_table(&self) -> [(u8,u8,u8); 32] {
+        let mut out = [(0,0,0); 32];
+        let palette_table = &self.ppu.palette_ram[..];
+        for i in 0..32 {
+            let c = palette_table[i];
+            out[i] = self.ppu.convert_color_to_rgb(c).into_tuple();
+        }
+        out
+    }
 }
 
 // #[cfg(test)]
