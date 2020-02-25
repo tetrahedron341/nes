@@ -1,5 +1,6 @@
 [workspace]
 members = [
     "nes_core",
-    "nes"
+    "nes",
+    "nes_wasm"
 ]
