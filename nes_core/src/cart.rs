@@ -6,9 +6,11 @@ use std::ops::Range;
 use crate::error::*;
 use crate::mapper::{self, Mapper};
 
+pub type CartState = Box<dyn Mapper + Send + Sync>;
+
 pub struct Cart {
     ines: Ines,
-    mapper: Box<dyn Mapper>
+    mapper: Box<dyn Mapper + Send + Sync>
 }
 
 impl Cart {
@@ -48,6 +50,17 @@ impl Cart {
             ines: Ines::dummy(),
             mapper: Box::new(mapper::dummy::Dummy {})
         }
+    }
+
+    pub fn reset(&mut self) {
+        self.mapper.reset();
+    }
+
+    pub fn save_state(&self) -> CartState {
+        self.mapper.clone()
+    }
+    pub fn load_state(&mut self, s: CartState) {
+        self.mapper = s;
     }
 
     pub fn read(&self, addr: u16) -> u8 {

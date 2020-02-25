@@ -16,7 +16,7 @@ bitflags! {
 }
 
 #[allow(non_snake_case)]
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct MOS6502 {
     pub A: Register<u8>,
     pub X: Register<u8>,
@@ -154,7 +154,10 @@ impl MOS6502 {
                 Indirect => {
                     let addr1 = fetch_double(&mut pc_temp, mmu);
                     raw_arg = Some(addr1);
-                    let addr2 = mmu.read_double(addr1);
+                    // Indirect addressing does not carry (This causes the JMP Indirect bug)
+                    let addr2_lo = mmu.read(addr1);
+                    let addr2_hi = mmu.read((addr1 & 0xff00) + ((addr1+1) & 0x00ff));
+                    let addr2 = ((addr2_hi as u16) << 8) | (addr2_lo as u16);
                     pointer = Some(addr2);
                     if !ins.no_read {mmu.read(addr2)} else {0}
                 },

@@ -5,6 +5,7 @@ use sdl2::rect::Rect;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
 use nes_core::controller::ControllerState;
+use nes_core::nes::NesSaveState;
 use std::env;
 use std::sync::RwLock;
 
@@ -118,14 +119,13 @@ fn main() {
     let mut canvas = window.into_canvas().build().unwrap();
     let tc = canvas.texture_creator();
     let screen = Screen::new(&tc, GAME_WIDTH/PIXEL_SCALE, GAME_HEIGHT/PIXEL_SCALE).unwrap();
-    println!("{}x{}", screen.w, screen.h);
     
     let controller = Controller::new();
 
     let cart = nes_core::cart::Cart::from_file(rom_name).unwrap();
     let mut nes = nes_core::nes::Nes::new(cart, &screen, &controller, None);
 
-    println!("VRAM: {:p}", &nes.mmu.vram);
+    let mut save_state: Option<NesSaveState> = None;
 
     let mut event_pump = sdl_ctx.event_pump().unwrap();
 
@@ -151,7 +151,15 @@ fn main() {
                 },
                 Event::KeyDown {keycode: Some(Keycode::R), keymod: sdl2::keyboard::Mod::LCTRLMOD, ..} |
                 Event::KeyDown {keycode: Some(Keycode::R), keymod: sdl2::keyboard::Mod::RCTRLMOD, ..} => {
-                    nes.cpu.reset();
+                    nes.reset();
+                },
+                Event::KeyDown {keycode: Some(Keycode::S), keymod: sdl2::keyboard::Mod::LCTRLMOD, ..} |
+                Event::KeyDown {keycode: Some(Keycode::S), keymod: sdl2::keyboard::Mod::RCTRLMOD, ..} => {
+                    save_state = Some(nes.save_state());
+                },
+                Event::KeyDown {keycode: Some(Keycode::L), keymod: sdl2::keyboard::Mod::LCTRLMOD, ..} |
+                Event::KeyDown {keycode: Some(Keycode::L), keymod: sdl2::keyboard::Mod::RCTRLMOD, ..} => {
+                    save_state.as_ref().map(|s| nes.load_state(s.clone()));
                 },
                 Event::KeyDown {keycode: Some(Keycode::P), ..} => {
                     paused = !paused;

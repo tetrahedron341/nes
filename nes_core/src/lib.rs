@@ -9,3 +9,6 @@ pub mod cart;
 pub mod mapper;
 pub mod mmu;
 pub mod controller;
+pub mod nes_builder;
+
+pub use nes_builder::nes_builder;

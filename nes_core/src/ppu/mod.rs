@@ -32,6 +32,10 @@ pub struct PPU {
     fg_pattern_shift_hi: [u8; 8],
     fg_pattern_shift_lo: [u8; 8],
 
+    // Sprite zero hit
+    sprite_zero_hit_possible: bool,
+    sprite_zero_rendering: bool,
+
     dot: u16,
     scanline: u16,
     pub frame: u64,
@@ -50,6 +54,12 @@ impl OAMEntry {
     pub fn to_bytes(self) -> [u8;4] {
         [self.y, self.tile_id, self.attr, self.x]
     }
+}
+
+#[derive(Clone)]
+pub struct PPUSaveState {
+    palette_ram: [u8; 0x20],
+    oam: [u8; 64*4]
 }
 
 impl PPU {
@@ -77,11 +87,33 @@ impl PPU {
             fg_pattern_shift_hi: [0; 8],
             fg_pattern_shift_lo: [0; 8],
 
+            sprite_zero_hit_possible: false,
+            sprite_zero_rendering: false,
+
             dot: 0,
             scanline: 261,
             frame: 0,
             nmi: false
         }
+    }
+
+    pub fn save_state(&self) -> PPUSaveState {
+        PPUSaveState {
+            palette_ram: {
+                let mut p_ram = [0; 0x20];
+                p_ram.as_mut().copy_from_slice(&self.palette_ram);
+                p_ram
+            },
+            oam: {
+                let mut oam = [0; 64*4];
+                oam.as_mut().copy_from_slice(&self.oam);
+                oam
+            }
+        }
+    }
+    pub fn load_state(&mut self, s: PPUSaveState) {
+        self.palette_ram.as_mut().copy_from_slice(&s.palette_ram);
+        self.oam.as_mut().copy_from_slice(&s.oam);
     }
 
     /// Run one cycle of the PPU, and output a pixel to the video interface
@@ -90,6 +122,11 @@ impl PPU {
 
         match self.scanline {
             0..=239 | 261 => { // Visible scanlines (And pre-render scanline)
+                if self.scanline == 261 && self.dot == 1 {
+                    chr.registers_mut().ppu_status = 0;
+                    self.fg_pattern_shift_hi = [0; 8];
+                    self.fg_pattern_shift_lo = [0; 8];
+                }
                 if self.scanline == 1 && self.dot == 1 {
                     self.nmi = false // Start of a new frame
                 };
@@ -181,12 +218,16 @@ impl PPU {
                     self.scanline_sprites = [0; 8*4];
                     self.sprite_count = 0;
                     let sprite_height = if chr.registers().ppu_ctrl & 0x20 != 0 {16} else {8};
+                    self.sprite_zero_hit_possible = false;
                     for i in 0..64 {
                         if self.sprite_count >= 9 { break }
                         let entry = self.get_oam_entry(i);
                         let diff = self.scanline as i32 - entry.y as i32;
                         if diff >= 0 && diff < sprite_height {
                             if self.sprite_count < 8 {
+                                if i == 0 {
+                                    self.sprite_zero_hit_possible = true;
+                                }
                                 let off = self.sprite_count as usize * 4;
                                 self.scanline_sprites[off..off+4].clone_from_slice(&entry.to_bytes());
                             }
@@ -291,6 +332,7 @@ impl PPU {
         let mut fg_pixel: u8 = 0;
         let mut fg_priority = false;
         if chr.registers().ppu_mask & 0x10 != 0 {
+            self.sprite_zero_rendering = false;
             for i in 0..self.sprite_count {
                 let entry = OAMEntry {
                     y: self.scanline_sprites[i as usize*4 + 0],
@@ -305,7 +347,9 @@ impl PPU {
                     fg_palette = (entry.attr & 0x03) + 0b0100;
                     fg_priority = (entry.attr & 0x20) == 0;
                     if fg_pixel != 0 {
-                        
+                        if i == 0 {
+                            self.sprite_zero_rendering = true;
+                        }
                         break
                     }
                 }
@@ -332,9 +376,29 @@ impl PPU {
                 pixel = bg_pixel;
                 palette = bg_palette;
             }
+
+            // Perform sprite 0 hit detection
+            if self.sprite_zero_hit_possible && self.sprite_zero_rendering {
+                let mask = chr.registers().ppu_mask;
+                // Check if both render background and render sprites are enabled
+                if mask & 0x18 == 0x18 {
+                    // Check if both FG and BG are disabled on the leftmost 8 pixels
+                    if mask & 0x06 == 0x00 {
+                        if self.dot >= 9 && self.dot < 258 {
+                            // Set the sprite 0 hit bit
+                            chr.registers_mut().ppu_status |= 0x40;
+                        }
+                    } else {
+                        if self.dot >= 1 && self.dot < 258 {
+                            // Set the sprite 0 hit bit
+                            chr.registers_mut().ppu_status |= 0x40;
+                        }
+                    }
+                }
+            }
         }
         
-        let color = self.palette_ram[(palette<<2 | pixel) as usize];
+        let color = self.read_palette_ram((palette<<2 | pixel) as usize);
         video_out.draw_pixel(self.dot.wrapping_sub(1), self.scanline, self.convert_color_to_rgb(color));
 
         self.dot += 1;
@@ -347,6 +411,25 @@ impl PPU {
             }
         }
     }
+
+    fn read_palette_ram(&self, i: usize) -> u8 {
+        if i >= 16 && i & 0b11 == 0 {
+            // Mirror the background color of all palettes to $3F00
+            self.palette_ram[0]
+        } else {
+            self.palette_ram[i]
+        }
+    }
+    fn write_palette_ram(&mut self, i: usize, v: u8) {
+        if i > 0 && i & 0b11 == 0 {
+            // Writes to the first color of sprite palettes are mirrored to the 
+            // first color of their respective background palette
+            self.palette_ram[i & 0b0111] = v;
+        } else {
+            self.palette_ram[i] = v;
+        }
+    }
+
     fn update_from_registers(&mut self, chr: &mut dyn PPUMemory) {
         if let Some((index,is_write)) = chr.registers_mut().last_access_from.take() {
             match index {
@@ -425,7 +508,7 @@ impl PPU {
             0x0000..=0x1fff => chr.write_ppu(addr, v),
             0x2000..=0x2fff => chr.write_ppu(addr, v),
             0x3000..=0x3eff => chr.write_ppu(addr-0x1000, v),
-            0x3f00..=0x3fff => self.palette_ram[(addr-0x3f00) as usize % 0x20] = v,
+            0x3f00..=0x3fff => self.write_palette_ram((addr-0x3f00) as usize % 0x20, v),
             _ => ()
         }
     }
@@ -435,7 +518,7 @@ impl PPU {
             // Nametables
             0x2000..=0x2fff => chr.read_ppu(addr),
             0x3000..=0x3eff => chr.read_ppu(addr-0x1000), // Mirror
-            0x3f00..=0x3fff => self.palette_ram[(addr-0x3f00) as usize % 0x20],
+            0x3f00..=0x3fff => self.read_palette_ram((addr-0x3f00) as usize % 0x20),
             _ => 0xff
         }
     }
@@ -496,7 +579,7 @@ impl PPU {
         let mut out = String::new();
         for i in 0..64 {
             let entry = self.get_oam_entry(i);
-            out.push_str(&format!("{}: {:?}\n", i, entry));
+            out.push_str(&format!("{:02}: {{ y: {}, tile_id: ${:02X}, attr: {:08b}b, x: {} }} \n", i, entry.y, entry.tile_id, entry.attr, entry.x));
         }
         out
     }

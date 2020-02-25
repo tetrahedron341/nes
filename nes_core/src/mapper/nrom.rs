@@ -24,4 +24,8 @@ impl Mapper for NROM {
         }
     }
     fn write(&mut self, _: &Ines, _: u16, _: u8) { }
+    fn reset(&mut self) { }
+    fn clone(&self) -> Box<dyn Mapper + Send + Sync> {
+        Box::new(NROM {})
+    }
 }

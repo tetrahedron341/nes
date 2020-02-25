@@ -2,6 +2,7 @@ use super::Mapper;
 use super::Ines;
 
 #[allow(non_snake_case)]
+#[derive(Clone)]
 pub struct MMC1 {
     incoming_value: u8,
     bits_shifted: u8,
@@ -18,6 +19,7 @@ pub struct MMC1 {
     mirroring: Mirroring
 }
 
+#[derive(Clone)]
 enum Mirroring {
     OneScreenLowerBank,
     OneScreenUpperBank,
@@ -25,6 +27,7 @@ enum Mirroring {
     Horizontal
 }
 
+#[derive(Clone)]
 enum PrgMode {
     ThirtyTwoKilobyte,
     FixFirst,
@@ -144,5 +147,25 @@ impl Mapper for MMC1 {
             self.bits_shifted = 0;
             self.prg_mode = PrgMode::FixLast;
         }
+    }
+    fn reset(&mut self) {
+        std::mem::replace(self, MMC1 {
+            incoming_value: 0,
+            bits_shifted: 0,
+
+            prg_ram_enable: false,
+            prg_rom_bank_index: 0,
+
+            chr_rom_0_index: 0,
+            chr_rom_1_index: 1,
+
+            chr_mode: false,
+
+            prg_mode: PrgMode::FixLast,
+            mirroring: Mirroring::OneScreenLowerBank
+        });
+    }
+    fn clone(&self) -> Box<dyn Mapper + Send + Sync> {
+        Box::new(Clone::clone(self))
     }
 }

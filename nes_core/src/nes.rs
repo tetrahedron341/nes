@@ -1,6 +1,6 @@
 use crate::mos6502::MOS6502;
-use crate::ppu::{PPU, VideoInterface};
-use crate::mmu::MMU;
+use crate::ppu::{PPU, VideoInterface, Color, PPUSaveState};
+use crate::mmu::{MMU, MMUSaveState};
 use crate::cart::Cart;
 use crate::error::*;
 use crate::controller::NESController;
@@ -32,19 +32,43 @@ impl Into<crate::mmu::MMUConfig> for &NESConfig {
     }
 }
 
+struct NesVideoWrapper<V> { 
+    screen: V,
+    frame_completed: std::cell::Cell<bool>
+}
+
+impl<V: VideoInterface> VideoInterface for NesVideoWrapper<V> {
+    #[inline]
+    fn draw_pixel(&self, x: u16, y: u16, color: Color) {
+        self.screen.draw_pixel(x,y, color);
+    }
+    #[inline]
+    fn end_of_frame(&self) {
+        self.frame_completed.set(true);
+        self.screen.end_of_frame();
+    }
+}
+
+#[derive(Clone)]
+pub struct NesSaveState {
+    cpu_state: MOS6502,
+    mmu_state: MMUSaveState,
+    ppu_state: PPUSaveState
+}
+
 /// Represents the NES system.
 pub struct Nes<V: VideoInterface, C: NESController> {
     pub cpu: MOS6502,
     pub ppu: PPU,
     pub mmu: MMU<C>,
-    pub screen: V,
+    screen: NesVideoWrapper<V>,
     cycles_counter: u32,
     oam_write: Option<u8>,
     _config: NESConfig
 }
 
 impl<'a, V: VideoInterface, C: NESController> Nes<V,C> {
-    pub fn new(cart: Cart, screen: V, controller: C, config: Option<NESConfig>) -> Self {
+    pub fn new<T: Into<Option<Cart>>>(cart: T, screen: V, controller: C, config: Option<NESConfig>) -> Self {
         let mut cpu = MOS6502::new(config.as_ref().map(|c| c.into()));
         cpu.reset();
         let ppu = PPU::new();
@@ -53,14 +77,37 @@ impl<'a, V: VideoInterface, C: NESController> Nes<V,C> {
             cpu,
             ppu,
             mmu,
-            screen,
+            screen: NesVideoWrapper{screen, frame_completed: std::cell::Cell::new(false)},
             cycles_counter: 0,
             oam_write: None,
             _config: config.unwrap_or(NESConfig::empty())
         }
     }
 
+    pub fn reset(&mut self) {
+        self.cpu.reset();
+        self.mmu.reset();
+    }
+
+    pub fn save_state(&self) -> NesSaveState {
+        NesSaveState {
+            cpu_state: self.cpu.clone(),
+            mmu_state: self.mmu.save_state(),
+            ppu_state: self.ppu.save_state()
+        }
+    }
+
+    pub fn load_state(&mut self, s: NesSaveState) {
+        self.cpu = s.cpu_state;
+        self.mmu.load_state(s.mmu_state);
+        self.ppu.load_state(s.ppu_state);
+    }
+
     pub fn master_clock_tick(&mut self) -> Result<()> {
+        if !self.mmu.has_cartridge() {
+            return Err(Error::missing_cart())
+        }
+
         if self.mmu.oam_transfer {
             if let Some(v) = self.oam_write.take() {
                 self.ppu.oam[self.mmu.oam_offset as usize] = v;
@@ -94,15 +141,19 @@ impl<'a, V: VideoInterface, C: NESController> Nes<V,C> {
 
     /// Runs the CPU until it recieves an NMI, signaling the end of a frame.
     pub fn run_frame(&mut self) -> Result<()> {
-        let mut prev_nmi = true;
         loop {
             self.master_clock_tick()?;
-            let nmi = self.ppu.nmi;
-            if !prev_nmi && nmi { break }
-            prev_nmi = nmi;
+            if self.screen.frame_completed.get() {
+                self.screen.frame_completed.set(false);
+                break
+            }
         }
 
         Ok(())
+    }
+
+    pub fn insert_cartridge(&mut self, cart: Cart) {
+        self.mmu.insert_cartridge(cart)
     }
 
     pub fn pattern_table(&self) -> [u8; 0x2000] {

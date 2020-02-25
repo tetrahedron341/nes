@@ -5,7 +5,9 @@ pub enum Error {
     #[display(fmt="Format Error: {}", "_0")]
     FormatErr(String),
     #[display(fmt="Invalid Opcode at {:#06X}: {:#04X}", "_0", "_1")]
-    InvalidOpcodeErr(u16, u8)
+    InvalidOpcodeErr(u16, u8),
+    #[display(fmt="Missing cartridge!")]
+    MissingCartErr
 }
 
 impl Error {
@@ -15,6 +17,10 @@ impl Error {
 
     pub fn invalid_opcode(ip: u16, op: u8) -> Error {
         Error::InvalidOpcodeErr(ip, op)
+    }
+
+    pub fn missing_cart() -> Error {
+        Error::MissingCartErr
     }
 }
 
