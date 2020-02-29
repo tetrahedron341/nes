@@ -206,22 +206,35 @@ impl<C: NESController> MOS6502Memory for MMU<C> {
 }
 
 impl<C: NESController> PPUMemory for MMU<C> {
+    #[inline]
     fn read_ppu(&self, addr: u16) -> u8 {
         let cart = self.cart.as_ref().expect("Cartridge is not inserted!");
         match addr {
             0x0000..=0x1fff => cart.read(addr),
-            0x2000..=0x23ff => self.vram[(addr-0x2000) as usize],
+            0x2000..=0x23ff => match cart.mirroring() {
+                Mirroring::OneScreenUpperBank => self.vram[(addr-0x2000+0x400) as usize],
+                _ => self.vram[(addr-0x2000) as usize]
+            },
             0x2400..=0x27ff => match cart.mirroring() {
                 Mirroring::Vertical => self.vram[(addr-0x2000) as usize],
-                Mirroring::Horizontal => self.vram[(addr-0x2400) as usize] // Mirror to 0x2000-0x23ff
+                Mirroring::Horizontal => self.vram[(addr-0x2400) as usize], // Mirror to 0x2000-0x23ff
+                Mirroring::OneScreenLowerBank => self.vram[(addr-0x2400) as usize], // Mirror to 0x2000-0x23ff
+                Mirroring::OneScreenUpperBank => self.vram[(addr-0x2000) as usize], // Mirror to 0x2400-0x27ff
+                Mirroring::FourScreen => self.vram[(addr-0x2000) as usize]
             },
             0x2800..=0x2bff => match cart.mirroring() {
                 Mirroring::Vertical => self.vram[(addr-0x2800) as usize], // Mirror to 0x2000-0x23ff
-                Mirroring::Horizontal => self.vram[(addr-0x2000) as usize]
+                Mirroring::Horizontal => self.vram[(addr-0x2000) as usize],
+                Mirroring::OneScreenLowerBank => self.vram[(addr-0x2800) as usize], // Mirror to 0x2000-0x23ff
+                Mirroring::OneScreenUpperBank => self.vram[(addr-0x2400) as usize], // Mirror to 0x2400-0x27ff
+                Mirroring::FourScreen => self.vram[(addr-0x2000) as usize]
             },
             0x2c00..=0x2fff => match cart.mirroring() {
                 Mirroring::Vertical => self.vram[(addr-0x2800) as usize], // Mirror to 0x2400-0x27ff
-                Mirroring::Horizontal => self.vram[(addr-0x2400) as usize] // Mirror to 0x2800-0x2bff
+                Mirroring::Horizontal => self.vram[(addr-0x2400) as usize], // Mirror to 0x2800-0x2bff
+                Mirroring::OneScreenLowerBank => self.vram[(addr-0x2c00) as usize], // Mirror to 0x2000-0x23ff
+                Mirroring::OneScreenUpperBank => self.vram[(addr-0x2800) as usize], // Mirror to 0x2400-0x27ff
+                Mirroring::FourScreen => self.vram[(addr-0x2000) as usize]
             },
             _ => 0xff
         }
@@ -230,18 +243,30 @@ impl<C: NESController> PPUMemory for MMU<C> {
         let cart = self.cart.as_mut().expect("Cartridge is not inserted!");
         match addr {
             0x0000..=0x1fff => (), // TODO: Add CHR RAM support
-            0x2000..=0x23ff => self.vram[(addr-0x2000) as usize] = v,
+            0x2000..=0x23ff => match cart.mirroring() {
+                Mirroring::OneScreenUpperBank => self.vram[(addr-0x2000+0x400) as usize] = v,
+                _ => self.vram[(addr-0x2000) as usize] = v
+            },
             0x2400..=0x27ff => match cart.mirroring() {
                 Mirroring::Vertical => self.vram[(addr-0x2000) as usize] = v,
-                Mirroring::Horizontal => self.vram[(addr-0x2400) as usize] = v // Mirror to 0x2000-0x23ff
+                Mirroring::Horizontal => self.vram[(addr-0x2400) as usize] = v, // Mirror to 0x2000-0x23ff
+                Mirroring::OneScreenLowerBank => self.vram[(addr-0x2400) as usize] = v, // Mirror to 0x2000-0x23ff
+                Mirroring::OneScreenUpperBank => self.vram[(addr-0x2000) as usize] = v, // Mirror to 0x2400-0x27ff
+                Mirroring::FourScreen => self.vram[(addr-0x2000) as usize] = v
             },
             0x2800..=0x2bff => match cart.mirroring() {
                 Mirroring::Vertical => self.vram[(addr-0x2800) as usize] = v, // Mirror to 0x2000-0x23ff
-                Mirroring::Horizontal => self.vram[(addr-0x2000) as usize] = v
+                Mirroring::Horizontal => self.vram[(addr-0x2000) as usize] = v,
+                Mirroring::OneScreenLowerBank => self.vram[(addr-0x2800) as usize] = v, // Mirror to 0x2000-0x23ff
+                Mirroring::OneScreenUpperBank => self.vram[(addr-0x2400) as usize] = v, // Mirror to 0x2400-0x27ff
+                Mirroring::FourScreen => self.vram[(addr-0x2000) as usize] = v
             },
             0x2c00..=0x2fff => match cart.mirroring() {
                 Mirroring::Vertical => self.vram[(addr-0x2800) as usize] = v, // Mirror to 0x2400-0x27ff
-                Mirroring::Horizontal => self.vram[(addr-0x2400) as usize] = v // Mirror to 0x2800-0x2bff
+                Mirroring::Horizontal => self.vram[(addr-0x2400) as usize] = v, // Mirror to 0x2800-0x2bff
+                Mirroring::OneScreenLowerBank => self.vram[(addr-0x2c00) as usize] = v, // Mirror to 0x2000-0x23ff
+                Mirroring::OneScreenUpperBank => self.vram[(addr-0x2800) as usize] = v, // Mirror to 0x2400-0x27ff
+                Mirroring::FourScreen => self.vram[(addr-0x2000) as usize] = v
             },
             _ => ()
         }

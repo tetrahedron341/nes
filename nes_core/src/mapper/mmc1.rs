@@ -1,5 +1,6 @@
 use super::Mapper;
 use super::Ines;
+use super::Mirroring;
 
 #[allow(non_snake_case)]
 #[derive(Clone)]
@@ -13,18 +14,10 @@ pub struct MMC1 {
     chr_rom_0_index: u8,
     chr_rom_1_index: u8,
 
-    chr_mode: bool,
+    chr_separate: bool,
 
     prg_mode: PrgMode,
     mirroring: Mirroring
-}
-
-#[derive(Clone)]
-enum Mirroring {
-    OneScreenLowerBank,
-    OneScreenUpperBank,
-    Vertical,
-    Horizontal
 }
 
 #[derive(Clone)]
@@ -46,7 +39,7 @@ impl MMC1 {
             chr_rom_0_index: 0,
             chr_rom_1_index: 1,
 
-            chr_mode: false,
+            chr_separate: false,
 
             prg_mode: PrgMode::FixLast,
             mirroring: Mirroring::OneScreenLowerBank
@@ -86,11 +79,27 @@ impl MMC1 {
         };
         slice[addr as usize]
     }
-    fn chr_bank_0(&self, _ines: &Ines, _addr: u16) -> u8 {
-        0
+    fn chr_bank_0(&self, ines: &Ines, addr: u16) -> u8 {
+        let chr_rom = ines.chr_rom_slice();
+        let slice = if self.chr_separate {
+            let offset = 0x1000 * self.chr_rom_0_index as usize;
+            &chr_rom[offset .. offset + 0x1000]
+        } else {
+            let offset = 0x2000 * (self.chr_rom_0_index as usize >> 1);
+            &chr_rom[offset .. offset + 0x1000]
+        };
+        slice[addr as usize]
     }
-    fn chr_bank_1(&self, _ines: &Ines, _addr: u16) -> u8 {
-        0
+    fn chr_bank_1(&self, ines: &Ines, addr: u16) -> u8 {
+        let chr_rom = ines.chr_rom_slice();
+        let slice = if self.chr_separate {
+            let offset = 0x1000 * self.chr_rom_1_index as usize;
+            &chr_rom[offset .. offset + 0x1000]
+        } else {
+            let offset = 0x2000 * (self.chr_rom_0_index as usize >> 1);
+            &chr_rom[offset + 0x1000 .. offset + 0x2000]
+        };
+        slice[addr as usize]
     }
 }
 
@@ -119,31 +128,37 @@ impl Mapper for MMC1 {
             if self.bits_shifted >= 5 {
                 match addr {
                     0x8000..=0x9FFF => {
+                        // println!("CONTROL {:b}", self.incoming_value);
                         let mirror_v = self.incoming_value & 0b00011;
                         let prg_v = (self.incoming_value & 0b01100) >> 2;
                         let mirror = match mirror_v { 0 => Mirroring::OneScreenLowerBank, 1 => Mirroring::OneScreenUpperBank, 2 => Mirroring::Vertical, 3 => Mirroring::Horizontal, _ => unreachable!()};
                         let prg_mode = match prg_v { 0 | 1 => PrgMode::ThirtyTwoKilobyte, 2 => PrgMode::FixFirst, 3 => PrgMode::FixLast, _ => unreachable!()};
                         self.mirroring = mirror;
                         self.prg_mode = prg_mode;
-                        self.chr_mode = self.incoming_value & 0b10000 != 0;
+                        self.chr_separate = self.incoming_value & 0b10000 != 0;
                     },
                     0xA000..=0xBFFF => {
+                        // println!("CHR0 {:b}", self.incoming_value);
                         self.chr_rom_0_index = self.incoming_value;
                     },
                     0xC000..=0xDFFF => {
+                        // println!("CHR1 {:b}", self.incoming_value);
                         self.chr_rom_1_index = self.incoming_value;
                     },
                     0xE000..=0xFFFF => {
+                        // println!("PRG {:b}", self.incoming_value);
                         self.prg_rom_bank_index = self.incoming_value & 0b01111;
                         self.prg_ram_enable = self.incoming_value & 0b10000 != 0;
                     },
                     _ => {}
                 }
-                self.incoming_value = 0;
+                self.incoming_value = 0b10000;
                 self.bits_shifted = 0;
+            } else {
+                // println!("MMC1 WRITE {:b}", v);
             }
         } else {
-            self.incoming_value = 0;
+            self.incoming_value = 0b10000;
             self.bits_shifted = 0;
             self.prg_mode = PrgMode::FixLast;
         }
@@ -159,7 +174,7 @@ impl Mapper for MMC1 {
             chr_rom_0_index: 0,
             chr_rom_1_index: 1,
 
-            chr_mode: false,
+            chr_separate: false,
 
             prg_mode: PrgMode::FixLast,
             mirroring: Mirroring::OneScreenLowerBank
@@ -167,5 +182,8 @@ impl Mapper for MMC1 {
     }
     fn clone(&self) -> Box<dyn Mapper + Send + Sync> {
         Box::new(Clone::clone(self))
+    }
+    fn mirroring(&self) -> Option<Mirroring> {
+        Some(self.mirroring)
     }
 }

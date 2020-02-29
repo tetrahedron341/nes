@@ -77,6 +77,12 @@ impl<'a> DebugScreen<'a> {
     }
 }
 
+struct NametableViewer {
+    canvas: sdl2::render::Canvas<sdl2::video::Window>,
+    tc: sdl2::render::TextureCreator<sdl2::video::WindowContext>,
+    window_id: u32
+}
+
 struct Controller {
     buttons: RwLock<ControllerState>
 }
@@ -115,6 +121,8 @@ fn main() {
         window.display_mode().unwrap().h,
         60
     )).unwrap();
+
+    let main_window_id = window.id();
     
     let mut canvas = window.into_canvas().build().unwrap();
     let tc = canvas.texture_creator();
@@ -131,6 +139,7 @@ fn main() {
 
     let mut selected_palette = 0;
     let mut paused = false;
+    let mut frame_unlocked = false;
 
     let mut debug_screen = DebugScreen::new(&tc).unwrap();
     let mut update_debug = false;
@@ -139,6 +148,8 @@ fn main() {
     let mut fps_timer = std::time::SystemTime::now();
     let mut fps: f64;
 
+    let mut nametable_viewer: Option<NametableViewer> = None;
+
     canvas.set_draw_color((0,0,255));
     canvas.clear();
 
@@ -146,12 +157,36 @@ fn main() {
         let frame_start_time = std::time::SystemTime::now();
         for event in event_pump.poll_iter() {
             match event {
-                Event::Quit{..} | Event::KeyDown {keycode: Some(Keycode::Escape), ..} => {
+                Event::Quit{..} => {
                     break 'running
+                },
+                Event::KeyDown {keycode: Some(Keycode::Escape), window_id, ..} => {
+                    if window_id == main_window_id {
+                        break 'running
+                    } else if Some(window_id) == nametable_viewer.as_ref().map(|nt_v| nt_v.window_id) {
+                        nametable_viewer.take();
+                    }
+                },
+                Event::Window {win_event, window_id, ..} => {
+                    use sdl2::event::WindowEvent;
+                    match win_event {
+                        WindowEvent::Close => {
+                            if window_id == main_window_id {
+                                break 'running
+                            } else if Some(window_id) == nametable_viewer.as_ref().map(|nt_v| nt_v.window_id) {
+                                nametable_viewer.take();
+                            }
+                        },
+                        _ => ()
+                    }
                 },
                 Event::KeyDown {keycode: Some(Keycode::R), keymod: sdl2::keyboard::Mod::LCTRLMOD, ..} |
                 Event::KeyDown {keycode: Some(Keycode::R), keymod: sdl2::keyboard::Mod::RCTRLMOD, ..} => {
                     nes.reset();
+                },
+                Event::KeyDown {keycode: Some(Keycode::T), keymod: sdl2::keyboard::Mod::LCTRLMOD, ..} |
+                Event::KeyDown {keycode: Some(Keycode::T), keymod: sdl2::keyboard::Mod::RCTRLMOD, ..} => {
+                    nametable_viewer.replace(create_nametable_viewer(&video));
                 },
                 Event::KeyDown {keycode: Some(Keycode::S), keymod: sdl2::keyboard::Mod::LCTRLMOD, ..} |
                 Event::KeyDown {keycode: Some(Keycode::S), keymod: sdl2::keyboard::Mod::RCTRLMOD, ..} => {
@@ -161,6 +196,12 @@ fn main() {
                 Event::KeyDown {keycode: Some(Keycode::L), keymod: sdl2::keyboard::Mod::RCTRLMOD, ..} => {
                     save_state.as_ref().map(|s| nes.load_state(s.clone()));
                 },
+
+                Event::KeyDown {keycode: Some(Keycode::LAlt), ..} |
+                Event::KeyDown {keycode: Some(Keycode::RAlt), ..} => {
+                    frame_unlocked = !frame_unlocked;
+                },
+
                 Event::KeyDown {keycode: Some(Keycode::P), ..} => {
                     paused = !paused;
                 },
@@ -178,7 +219,7 @@ fn main() {
                     println!("{}", nes.ppu.print_oam());
                 },
                 Event::KeyDown {keycode: Some(Keycode::R), ..} => {
-                    println!("{:?}", nes.mmu.ppu_registers);
+                    println!("{:X?}", nes.mmu.ppu_registers);
                 },
 
                 Event::KeyDown {keycode: Some(Keycode::Z), ..} => {
@@ -264,6 +305,7 @@ fn main() {
             // Update the debug screen
             let pattern_table = nes.pattern_table();
             let palette = nes.get_palette(selected_palette);
+            let bg_color = nes.get_palette(0)[0];
             debug_screen.pt1.with_lock(None, |buf, pitch| {
                 for tr in 0..16 {
                     for tc in 0..16 {
@@ -278,7 +320,11 @@ fn main() {
                                 let px_hi = (byte_hi & mask) >> (7-x);
                                 let px_lo = (byte_lo & mask) >> (7-x);
                                 let px = (px_hi << 1) | px_lo;
-                                let (r,g,b) = palette[px as usize];
+                                let (r,g,b) = if px == 0 {
+                                    bg_color
+                                } else {
+                                    palette[px as usize]
+                                };
 
                                 let ty = (tr*8) + y;
                                 let tx = (tc*8) + x;
@@ -304,7 +350,11 @@ fn main() {
                                 let px_hi = (byte_hi & mask) >> (7-x);
                                 let px_lo = (byte_lo & mask) >> (7-x);
                                 let px = (px_hi << 1) | px_lo;
-                                let (r,g,b) = palette[px as usize];
+                                let (r,g,b) = if px == 0 {
+                                    bg_color
+                                } else {
+                                    palette[px as usize]
+                                };
 
                                 let ty = (tr*8) + y;
                                 let tx = (tc*8) + x;
@@ -341,6 +391,67 @@ fn main() {
         canvas.copy(&debug_screen.pt1, None, Rect::new(GAME_WIDTH as i32 + 15                         , 15, 128*PIXEL_SCALE, 128*PIXEL_SCALE)).unwrap();
         canvas.copy(&debug_screen.pt2, None, Rect::new(GAME_WIDTH as i32 + 128*PIXEL_SCALE as i32 + 30, 15, 128*PIXEL_SCALE, 128*PIXEL_SCALE)).unwrap();
 
+        // Update the nametable viewer (if it exists)
+        nametable_viewer.as_mut().map(|nt_v| {
+            let mut txt = nt_v.tc.create_texture_streaming(sdl2::pixels::PixelFormatEnum::RGB24, 512, 480).unwrap();
+            txt.with_lock(None, |buf, pitch| {
+                let pattern_table = nes.pattern_table();
+                let pattern_table = if nes.mmu.ppu_registers.ppu_ctrl & 0b00010000 == 0 {
+                    &pattern_table[0..0x1000]
+                } else {
+                    &pattern_table[0x1000 ..]
+                };
+                let palette_table = nes.palette_table();
+                let bg_color = palette_table[0];
+                let vram = nes.get_nametables();
+                for table in 0..4 {
+                    let table_off = 0x400 * table;
+                    let (table_x, table_y) = match table {
+                        0 => (0,0),
+                        1 => (256,0),
+                        2 => (0,240),
+                        3 => (256,240),
+                        _ => unreachable!()
+                    };
+                    let nametable = &vram[table_off .. table_off + 0x400];
+                    let attr_table = &nametable[0x3c0 ..];
+                    for row in 0..30 {
+                        for tile in 0..32 {
+                            let attr = attr_table[(row/4)*0x8 + (tile/4)];
+                            let palette = match ((row/2)%2)*2 + ((tile/2)%2) {
+                                0b00 => attr & 0b00000011,
+                                0b01 => (attr & 0b00001100) >> 2,
+                                0b10 => (attr & 0b00110000) >> 4,
+                                0b11 => (attr & 0b11000000) >> 6,
+                                _ => unreachable!()
+                            };
+                            let pattern_byte = nametable[row*0x20 + tile];
+                            for p_row in 0..8 {
+                                let lo = pattern_table[((pattern_byte as u16)<<4) as usize + p_row];
+                                let hi = pattern_table[((pattern_byte as u16)<<4) as usize + p_row + 8];
+                                for pixel in 0..8 {
+                                    let px_hi = (hi >> (7-pixel)) & 1;
+                                    let px_lo = (lo >> (7-pixel)) & 1;
+                                    let px = px_hi << 1 | px_lo;
+                                    let (r,g,b) = if px == 0 {
+                                        bg_color
+                                    } else {
+                                        palette_table[(palette<<2 | px) as usize]
+                                    };
+                                    // print!("{:?}",(r,g,b));
+                                    buf[pitch*((table_y + row*8) + p_row) + (table_x + tile*8 + pixel)*3 + 0] = r;
+                                    buf[pitch*((table_y + row*8) + p_row) + (table_x + tile*8 + pixel)*3 + 1] = g;
+                                    buf[pitch*((table_y + row*8) + p_row) + (table_x + tile*8 + pixel)*3 + 2] = b;
+                                }
+                            }
+                        }
+                    }
+                }
+            }).unwrap();
+            nt_v.canvas.copy(&txt, None, Rect::new(0,0,512,480)).unwrap();
+            nt_v.canvas.present();
+        });
+
         canvas.present();
         fps_count += 1;
         if fps_count >= 60 {
@@ -350,6 +461,21 @@ fn main() {
             fps_count = 0;
             canvas.window_mut().set_title(&format!("{}: {}x{} FPS: {:.2} {}", TITLE, GAME_WIDTH + DEBUG_WIDTH, GAME_HEIGHT, fps, if paused {"Paused"} else {""})).unwrap();
         }
-        std::thread::sleep(std::time::Duration::from_micros(1_000_000 / 60).checked_sub(frame_start_time.elapsed().unwrap()).unwrap_or_default())
+        if !frame_unlocked {
+            std::thread::sleep(std::time::Duration::from_micros(1_000_000 / 60).checked_sub(frame_start_time.elapsed().unwrap()).unwrap_or_default())
+        }
+    }
+}
+
+fn create_nametable_viewer(video: &sdl2::VideoSubsystem) -> NametableViewer {
+    let mut window = video
+        .window("Nametable viewer", 512, 480)
+        .build().unwrap();
+    window.set_minimum_size(512,480).unwrap();
+    let window_id = window.id();
+    let canvas = window.into_canvas().build().unwrap();
+    let tc = canvas.texture_creator();
+    NametableViewer {
+        canvas, tc, window_id
     }
 }

@@ -77,7 +77,9 @@ impl Cart {
         &self.ines
     }
     pub fn mirroring(&self) -> Mirroring {
-        self.ines.mirroring()
+        self.mapper.mirroring().unwrap_or(
+            self.ines.mirroring()
+        )
     }
 }
 
@@ -154,5 +156,8 @@ impl Ines {
 #[derive(Clone,Copy,Debug,PartialEq)]
 pub enum Mirroring {
     Horizontal,
-    Vertical
+    Vertical,
+    OneScreenLowerBank,
+    OneScreenUpperBank,
+    FourScreen
 }

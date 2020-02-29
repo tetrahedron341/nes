@@ -185,6 +185,16 @@ impl<'a, V: VideoInterface, C: NESController> Nes<V,C> {
         }
         out
     }
+
+    /// Returns a clone of 0x2000-0x2fff of PPU memory
+    pub fn get_nametables(&self) -> [u8; 0x1000] {
+        let mut buf = [0; 0x1000];
+        for i in 0..0x1000 {
+            use crate::ppu::PPUMemory;
+            buf[i] = self.mmu.read_ppu(0x2000 + i as u16);
+        }
+        buf
+    }
 }
 
 // #[cfg(test)]
