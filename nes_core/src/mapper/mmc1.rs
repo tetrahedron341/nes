@@ -2,6 +2,9 @@ use super::Mapper;
 use super::Ines;
 use super::Mirroring;
 
+const CHR_RAM_SIZE: usize = 0x2000;
+const PRG_RAM_SIZE: usize = 0x2000;
+
 #[allow(non_snake_case)]
 #[derive(Clone)]
 pub struct MMC1 {
@@ -17,7 +20,10 @@ pub struct MMC1 {
     chr_separate: bool,
 
     prg_mode: PrgMode,
-    mirroring: Mirroring
+    mirroring: Mirroring,
+
+    chr_ram: [u8; CHR_RAM_SIZE],
+    prg_ram: [u8; PRG_RAM_SIZE]
 }
 
 #[derive(Clone)]
@@ -42,7 +48,10 @@ impl MMC1 {
             chr_separate: false,
 
             prg_mode: PrgMode::FixLast,
-            mirroring: Mirroring::OneScreenLowerBank
+            mirroring: Mirroring::OneScreenLowerBank,
+
+            chr_ram: [0; CHR_RAM_SIZE],
+            prg_ram: [0; PRG_RAM_SIZE]
         }
     }
 
@@ -81,44 +90,55 @@ impl MMC1 {
     }
     fn chr_bank_0(&self, ines: &Ines, addr: u16) -> u8 {
         let chr_rom = ines.chr_rom_slice();
+        let chr = chr_rom.unwrap_or(&self.chr_ram[..]);
         let slice = if self.chr_separate {
             let offset = 0x1000 * self.chr_rom_0_index as usize;
-            &chr_rom[offset .. offset + 0x1000]
+            &chr[offset .. offset + 0x1000]
         } else {
             let offset = 0x2000 * (self.chr_rom_0_index as usize >> 1);
-            &chr_rom[offset .. offset + 0x1000]
+            &chr[offset .. offset + 0x1000]
         };
         slice[addr as usize]
     }
     fn chr_bank_1(&self, ines: &Ines, addr: u16) -> u8 {
         let chr_rom = ines.chr_rom_slice();
+        let chr = chr_rom.unwrap_or(&self.chr_ram[..]);
         let slice = if self.chr_separate {
             let offset = 0x1000 * self.chr_rom_1_index as usize;
-            &chr_rom[offset .. offset + 0x1000]
+            &chr[offset .. offset + 0x1000]
         } else {
             let offset = 0x2000 * (self.chr_rom_0_index as usize >> 1);
-            &chr_rom[offset + 0x1000 .. offset + 0x2000]
+            &chr[offset + 0x1000 .. offset + 0x2000]
         };
         slice[addr as usize]
     }
-}
 
-impl Mapper for MMC1 {
-    fn name(&self) -> &'static str {
-        "MMC1/SxROM"
-    }
-    fn read(&self, ines: &Ines, addr: u16) -> u8 {
-        match addr {
-            0x0000..=0x0FFF => {self.chr_bank_0(ines, addr)}, // 4KB switchable CHR bank
-            0x1000..=0x1FFF => {self.chr_bank_1(ines, addr-0x1000)}, // 4KB switchable CHR bank
-            0x6000..=0x7FFF => { 0 }, // 8KB PRG RAM (optional) (RAM isn't implemented)
-            0x8000..=0xBFFF => {self.prg_bank_0(ines, addr-0x8000)}, // 16KB PRG ROM (first bank or switchable)
-            0xC000..=0xFFFF => {self.prg_bank_1(ines, addr-0xC000)}, // 16KB PRG ROM (last bank or switchable)
-
-            _ => 0 // Not mapped anywhere
+    fn write_chr_bank_0(&mut self, ines: &Ines, addr: u16, v: u8) {
+        if ines.chr_rom_slice().is_none() {
+            let slice = if self.chr_separate {
+                let offset = 0x1000 * self.chr_rom_0_index as usize;
+                &mut self.chr_ram[offset .. offset + 0x1000]
+            } else {
+                let offset = 0x2000 * (self.chr_rom_0_index as usize >> 1);
+                &mut self.chr_ram[offset .. offset + 0x1000]
+            };
+            slice[addr as usize] = v;
         }
     }
-    fn write(&mut self, _ines: &Ines, addr: u16, v: u8) {
+    fn write_chr_bank_1(&mut self, ines: &Ines, addr: u16, v: u8) {
+        if ines.chr_rom_slice().is_none() {
+            let slice = if self.chr_separate {
+                let offset = 0x1000 * self.chr_rom_1_index as usize;
+                &mut self.chr_ram[offset .. offset + 0x1000]
+            } else {
+                let offset = 0x2000 * (self.chr_rom_0_index as usize >> 1);
+                &mut self.chr_ram[offset + 0x1000 .. offset + 0x2000]
+            };
+            slice[addr as usize] = v;
+        }
+    }
+
+    fn write_register(&mut self, addr: u16, v: u8) {
         let low_bit = v & 0x01;
         let high_bit = v & 0x80;
         if high_bit == 0 {
@@ -148,7 +168,7 @@ impl Mapper for MMC1 {
                     0xE000..=0xFFFF => {
                         // println!("PRG {:b}", self.incoming_value);
                         self.prg_rom_bank_index = self.incoming_value & 0b01111;
-                        self.prg_ram_enable = self.incoming_value & 0b10000 != 0;
+                        self.prg_ram_enable = self.incoming_value & 0b10000 == 0;
                     },
                     _ => {}
                 }
@@ -161,6 +181,42 @@ impl Mapper for MMC1 {
             self.incoming_value = 0b10000;
             self.bits_shifted = 0;
             self.prg_mode = PrgMode::FixLast;
+        }
+    }
+}
+
+impl Mapper for MMC1 {
+    fn name(&self) -> &'static str {
+        "MMC1/SxROM"
+    }
+    fn read(&self, ines: &Ines, addr: u16) -> u8 {
+        match addr {
+            0x0000..=0x0FFF => {self.chr_bank_0(ines, addr)}, // 4KB switchable CHR bank
+            0x1000..=0x1FFF => {self.chr_bank_1(ines, addr-0x1000)}, // 4KB switchable CHR bank
+            0x6000..=0x7FFF => {
+                if self.prg_ram_enable {
+                    self.prg_ram[addr as usize - 0x6000]
+                } else {
+                    0
+                }
+            }, // 8KB PRG RAM (optional)
+            0x8000..=0xBFFF => {self.prg_bank_0(ines, addr-0x8000)}, // 16KB PRG ROM (first bank or switchable)
+            0xC000..=0xFFFF => {self.prg_bank_1(ines, addr-0xC000)}, // 16KB PRG ROM (last bank or switchable)
+
+            _ => 0 // Not mapped anywhere
+        }
+    }
+    fn write(&mut self, ines: &Ines, addr: u16, v: u8) {
+        match addr {
+            0x0000..=0x0fff => self.write_chr_bank_0(ines, addr, v),
+            0x1000..=0x1fff => self.write_chr_bank_1(ines, addr-0x1000, v),
+            0x6000..=0x7fff => {
+                if self.prg_ram_enable {
+                    self.prg_ram[addr as usize - 0x6000] = v
+                }
+            },
+            0x8000..=0xffff => self.write_register(addr, v),
+            _ => {}
         }
     }
     fn reset(&mut self) {
@@ -177,7 +233,10 @@ impl Mapper for MMC1 {
             chr_separate: false,
 
             prg_mode: PrgMode::FixLast,
-            mirroring: Mirroring::OneScreenLowerBank
+            mirroring: Mirroring::OneScreenLowerBank,
+
+            chr_ram: [0; CHR_RAM_SIZE],
+            prg_ram: self.prg_ram
         });
     }
     fn clone(&self) -> Box<dyn Mapper + Send + Sync> {

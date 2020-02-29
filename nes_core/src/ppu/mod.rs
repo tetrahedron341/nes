@@ -263,7 +263,7 @@ impl PPU {
                             let row_sel = if entry.attr & 0x80 == 0 { 
                                 (self.scanline - entry.y as u16) & 0x07
                             } else { 
-                                7 - (self.scanline - entry.y as u16) & 0x07
+                                15 - (self.scanline - entry.y as u16) & 0x07
                             };
                             let table_addr = ((entry.tile_id & 0x01) as u16) << 12;
                             let mut top_tile_id = entry.tile_id & 0xFE;

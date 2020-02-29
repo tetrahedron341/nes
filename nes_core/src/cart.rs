@@ -92,6 +92,9 @@ pub struct Ines {
     pub prg_rom_range: Range<usize>,
     pub chr_rom_range: Range<usize>,
 
+    has_chr_ram: bool,
+    pub persistent_prg_ram: bool,
+
     data: Vec<u8>
 }
 
@@ -118,7 +121,9 @@ impl Ines {
             flags6, flags7,
             prg_rom_range,
             chr_rom_range,
-            data
+            data,
+            has_chr_ram: chr_size == 0,
+            persistent_prg_ram: flags6 & 0b10 != 0
         })
     }
 
@@ -128,7 +133,9 @@ impl Ines {
             flags6: 0, flags7: 0,
             prg_rom_range: 0..0,
             chr_rom_range: 0..0,
-            data: Vec::new()
+            data: Vec::new(),
+            has_chr_ram: false,
+            persistent_prg_ram: false
         }
     }
 
@@ -141,8 +148,13 @@ impl Ines {
     pub fn prg_rom_slice(&self) -> &[u8] {
         &self.data[self.prg_rom_range.start .. self.prg_rom_range.end]
     }
-    pub fn chr_rom_slice(&self) -> &[u8] {
-        &self.data[self.chr_rom_range.start .. self.chr_rom_range.end]
+    /// Returns `None` if the cartridge has CHR RAM
+    pub fn chr_rom_slice(&self) -> Option<&[u8]> {
+        if self.has_chr_ram {
+            None
+        } else {
+            Some(&self.data[self.chr_rom_range.start .. self.chr_rom_range.end])
+        }
     }
     pub fn mirroring(&self) -> Mirroring {
         if self.flags6 & 0x01 != 0 {

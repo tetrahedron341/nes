@@ -8,7 +8,6 @@ build = "build.rs"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-structopt = { version = "0.3.4", default-features = false }
+# structopt = { version = "0.3.4", default-features = false }
 nes_core = { path = "../nes_core" }
 sdl2 = { version = "0.32.2", features = ["ttf"] }
-bitflags = "1.2.1"

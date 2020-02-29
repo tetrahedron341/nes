@@ -15,7 +15,7 @@ bitflags! {
 
 pub struct MMUSaveState {
     ram: [u8; 2048],
-    vram: [u8; 0x1000],
+    vram: [[u8; 0x400]; 4],
     registers: [u8; 0x20],
     cart_state: Option<CartState>
 }
@@ -29,7 +29,7 @@ impl Clone for MMUSaveState {
                 ram
             },
             vram: {
-                let mut vram = [0; 0x1000];
+                let mut vram = [[0; 0x400]; 4];
                 vram.as_mut().copy_from_slice(&self.vram);
                 vram
             },
@@ -47,7 +47,7 @@ pub struct MMU<C: NESController> {
     pub cart: Option<Cart>,
     pub ram: [u8; 2048],
     pub ppu_registers: PPURegisters,
-    pub vram: [u8; 0x1000],
+    pub vram: [[u8; 0x400]; 4],
     pub registers: [u8; 0x20],
     pub controller: C,
     controller_shift: Cell<u8>,
@@ -68,7 +68,7 @@ impl<C: NESController> MMU<C> {
             ram: [0; 2048],
             ppu_registers: PPURegisters::new(),
             registers: [0; 0x20],
-            vram: [0; 0x1000],
+            vram: [[0; 0x400]; 4],
             controller: controller,
             controller_shift: Cell::new(0),
 
@@ -91,7 +91,7 @@ impl<C: NESController> MMU<C> {
         self.cart.as_mut().map(|c| c.reset());
         self.ram = [0; 2048];
         self.registers = [0; 0x20];
-        self.vram = [0; 0x1000];
+        self.vram = [[0; 0x400]; 4];
         self.controller_shift.set(0);
         self.ppu_registers = PPURegisters::new();
     }
@@ -104,7 +104,7 @@ impl<C: NESController> MMU<C> {
                 ram
             },
             vram: {
-                let mut vram = [0; 0x1000];
+                let mut vram = [[0; 0x400]; 4];
                 vram.as_mut().copy_from_slice(&self.vram);
                 vram
             },
@@ -194,6 +194,40 @@ impl<C: NESController> MMU<C> {
     pub fn insert_cartridge(&mut self, cart: Cart) {
         self.cart = Some(cart);
     }
+
+    fn get_vram_bank_from_nametable_addr(mirroring: Mirroring, addr: u16) -> Option<usize> {
+        // VRAM is divided into 4 1KB banks A,B,C,D
+        // Banks C and D are only used in 4 Screen mode
+        // Mirroring is implemented by translating each nametable to a bank
+        match addr {
+            0x2000..=0x23ff => match mirroring {
+                Mirroring::OneScreenUpperBank => Some(1),
+                _ => Some(0)
+            },
+            0x2400..=0x27ff => match mirroring {
+                Mirroring::Vertical => Some(1),
+                Mirroring::Horizontal => Some(0),
+                Mirroring::OneScreenLowerBank => Some(0),
+                Mirroring::OneScreenUpperBank => Some(1),
+                Mirroring::FourScreen => Some(1)
+            },
+            0x2800..=0x2bff => match mirroring {
+                Mirroring::Vertical => Some(0),
+                Mirroring::Horizontal => Some(1),
+                Mirroring::OneScreenLowerBank => Some(0),
+                Mirroring::OneScreenUpperBank => Some(1),
+                Mirroring::FourScreen => Some(2)
+            },
+            0x2c00..=0x2fff => match mirroring {
+                Mirroring::Vertical => Some(1),
+                Mirroring::Horizontal => Some(1),
+                Mirroring::OneScreenLowerBank => Some(0),
+                Mirroring::OneScreenUpperBank => Some(1),
+                Mirroring::FourScreen => Some(3)
+            },
+            _ => None
+        }
+    }
 }
 
 impl<C: NESController> MOS6502Memory for MMU<C> {
@@ -209,66 +243,30 @@ impl<C: NESController> PPUMemory for MMU<C> {
     #[inline]
     fn read_ppu(&self, addr: u16) -> u8 {
         let cart = self.cart.as_ref().expect("Cartridge is not inserted!");
-        match addr {
-            0x0000..=0x1fff => cart.read(addr),
-            0x2000..=0x23ff => match cart.mirroring() {
-                Mirroring::OneScreenUpperBank => self.vram[(addr-0x2000+0x400) as usize],
-                _ => self.vram[(addr-0x2000) as usize]
-            },
-            0x2400..=0x27ff => match cart.mirroring() {
-                Mirroring::Vertical => self.vram[(addr-0x2000) as usize],
-                Mirroring::Horizontal => self.vram[(addr-0x2400) as usize], // Mirror to 0x2000-0x23ff
-                Mirroring::OneScreenLowerBank => self.vram[(addr-0x2400) as usize], // Mirror to 0x2000-0x23ff
-                Mirroring::OneScreenUpperBank => self.vram[(addr-0x2000) as usize], // Mirror to 0x2400-0x27ff
-                Mirroring::FourScreen => self.vram[(addr-0x2000) as usize]
-            },
-            0x2800..=0x2bff => match cart.mirroring() {
-                Mirroring::Vertical => self.vram[(addr-0x2800) as usize], // Mirror to 0x2000-0x23ff
-                Mirroring::Horizontal => self.vram[(addr-0x2000) as usize],
-                Mirroring::OneScreenLowerBank => self.vram[(addr-0x2800) as usize], // Mirror to 0x2000-0x23ff
-                Mirroring::OneScreenUpperBank => self.vram[(addr-0x2400) as usize], // Mirror to 0x2400-0x27ff
-                Mirroring::FourScreen => self.vram[(addr-0x2000) as usize]
-            },
-            0x2c00..=0x2fff => match cart.mirroring() {
-                Mirroring::Vertical => self.vram[(addr-0x2800) as usize], // Mirror to 0x2400-0x27ff
-                Mirroring::Horizontal => self.vram[(addr-0x2400) as usize], // Mirror to 0x2800-0x2bff
-                Mirroring::OneScreenLowerBank => self.vram[(addr-0x2c00) as usize], // Mirror to 0x2000-0x23ff
-                Mirroring::OneScreenUpperBank => self.vram[(addr-0x2800) as usize], // Mirror to 0x2400-0x27ff
-                Mirroring::FourScreen => self.vram[(addr-0x2000) as usize]
-            },
-            _ => 0xff
+        if (0x0000..=0x1fff).contains(&addr) {
+            cart.read(addr)
+        } else if (0x2000..=0x2fff).contains(&addr) {
+            let trunc_addr = (addr % 0x400) as usize;
+            if let Some(bank) = Self::get_vram_bank_from_nametable_addr(cart.mirroring(), addr) {
+                self.vram[bank][trunc_addr]
+            } else {
+                unreachable!()
+            }
+        } else {
+            0xff
         }
     }
     fn write_ppu(&mut self, addr: u16, v: u8) {
         let cart = self.cart.as_mut().expect("Cartridge is not inserted!");
-        match addr {
-            0x0000..=0x1fff => (), // TODO: Add CHR RAM support
-            0x2000..=0x23ff => match cart.mirroring() {
-                Mirroring::OneScreenUpperBank => self.vram[(addr-0x2000+0x400) as usize] = v,
-                _ => self.vram[(addr-0x2000) as usize] = v
-            },
-            0x2400..=0x27ff => match cart.mirroring() {
-                Mirroring::Vertical => self.vram[(addr-0x2000) as usize] = v,
-                Mirroring::Horizontal => self.vram[(addr-0x2400) as usize] = v, // Mirror to 0x2000-0x23ff
-                Mirroring::OneScreenLowerBank => self.vram[(addr-0x2400) as usize] = v, // Mirror to 0x2000-0x23ff
-                Mirroring::OneScreenUpperBank => self.vram[(addr-0x2000) as usize] = v, // Mirror to 0x2400-0x27ff
-                Mirroring::FourScreen => self.vram[(addr-0x2000) as usize] = v
-            },
-            0x2800..=0x2bff => match cart.mirroring() {
-                Mirroring::Vertical => self.vram[(addr-0x2800) as usize] = v, // Mirror to 0x2000-0x23ff
-                Mirroring::Horizontal => self.vram[(addr-0x2000) as usize] = v,
-                Mirroring::OneScreenLowerBank => self.vram[(addr-0x2800) as usize] = v, // Mirror to 0x2000-0x23ff
-                Mirroring::OneScreenUpperBank => self.vram[(addr-0x2400) as usize] = v, // Mirror to 0x2400-0x27ff
-                Mirroring::FourScreen => self.vram[(addr-0x2000) as usize] = v
-            },
-            0x2c00..=0x2fff => match cart.mirroring() {
-                Mirroring::Vertical => self.vram[(addr-0x2800) as usize] = v, // Mirror to 0x2400-0x27ff
-                Mirroring::Horizontal => self.vram[(addr-0x2400) as usize] = v, // Mirror to 0x2800-0x2bff
-                Mirroring::OneScreenLowerBank => self.vram[(addr-0x2c00) as usize] = v, // Mirror to 0x2000-0x23ff
-                Mirroring::OneScreenUpperBank => self.vram[(addr-0x2800) as usize] = v, // Mirror to 0x2400-0x27ff
-                Mirroring::FourScreen => self.vram[(addr-0x2000) as usize] = v
-            },
-            _ => ()
+        if (0x0000..=0x1fff).contains(&addr) {
+            cart.write(addr,v)
+        } else if (0x2000..=0x2fff).contains(&addr) {
+            let trunc_addr = (addr % 0x400) as usize;
+            if let Some(bank) = Self::get_vram_bank_from_nametable_addr(cart.mirroring(), addr) {
+                self.vram[bank][trunc_addr] = v;
+            } else {
+                unreachable!();
+            }
         }
     }
     fn registers(&self) -> &PPURegisters {
