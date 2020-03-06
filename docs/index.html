@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>NES Emulator</title>
+        <style>
+            body {
+                display: flex;
+                flex-direction: column;
+                align-items: center;
+                background-color: grey;
+            }
+            body > * {
+                margin: 5px;
+            }
+            #control_panel {
+                display: flex;
+                flex-direction: row;
+                justify-content: space-between;
+                background-color: whitesmoke;
+                border-style: solid;
+                border-color: black;
+                border-width: 3px;
+                border-radius: 5px;
+            }
+            #control_panel > button {
+                border-style: solid;
+                border-color: black;
+                border-width: 3px;
+                border-radius: 3px;
+                height: 50px;
+                width: 50px;
+                margin: 2px;
+                cursor: pointer;
+            }
+            #control_panel > button:active {
+                background-color: cyan;
+            }
+        </style>
+        <script src="https://kit.fontawesome.com/2947ccfe00.js" crossorigin="anonymous"></script>
+    </head>
+    <body>
+        <div id="control_panel">
+            <button onclick="reset_emulator()" title="Reset"><i class="fas fa-2x fa-redo" title="Reset"></i></button>
+            <button onclick="toggle_pause()" title="Pause (p)"><i id="pause_button" class="fas fa-2x fa-pause" title="Pause (p)"></i></button>
+        </div>
+        <canvas id="nes_canvas" width="512" height="480" style="image-rendering: pixelated; image-rendering: crisp-edges;"></canvas>
+        <input id="rom_input" type="file" accept=".nes" />
+    <script type="text/javascript" src="index.js"></script></body>
+</html>
