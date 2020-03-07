@@ -2,20 +2,23 @@
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use std::sync::Mutex;
+use std::sync::{Mutex, MutexGuard};
 use std::sync::RwLock;
 use std::convert::TryFrom;
 use nes_core::{
-    nes::Nes, 
+    nes::NesSaveState,
     ppu::{VideoInterface, Color}, 
     controller::{NESController, ControllerState},
     cart::Cart
 };
 use lazy_static::lazy_static;
 
+type Nes = nes_core::nes::Nes<CanvasOutput, &'static Controller>;
+
 lazy_static! {
-    static ref EMULATOR: Mutex<Option<Nes<CanvasOutput, &'static Controller>>> = Mutex::new(None);
+    static ref EMULATOR: Mutex<Option<Nes>> = Mutex::new(None);
     static ref CONTROLLER: Controller = Controller::new();
+    static ref SAVE_STATE: RwLock<Option<NesSaveState>> = RwLock::new(None);
 }
 
 struct Controller {
@@ -153,7 +156,7 @@ pub fn init_emulator() -> Result<(), JsValue> {
         .controller(&*CONTROLLER)
         .build(None,None);
 
-    let mut global_emu = EMULATOR.lock().map_err(|_| "Failed to acquire mutex")?;
+    let mut global_emu = get_nes()?;
     global_emu.replace(nes);
     
     Ok(())
@@ -161,8 +164,8 @@ pub fn init_emulator() -> Result<(), JsValue> {
 
 #[wasm_bindgen]
 pub fn advance_frame() -> Result<(), JsValue> {
-    let mut global_emu = EMULATOR.lock().map_err(|_| "Failed to acquire mutex")?;
-    let nes: &mut nes_core::nes::Nes<_,_> = global_emu.as_mut().ok_or("Emulator has not been initialized yet")?;
+    let mut global_emu = get_nes()?;
+    let nes = global_emu.as_mut().ok_or("Emulator has not been initialized yet")?;
 
     nes.run_frame().map_err(|e| format!("{}", e))?;
 
@@ -174,8 +177,8 @@ pub fn insert_cartridge(rom: Box<[u8]>) -> Result<(), JsValue> {
     let rom = rom.into_vec();
     let cart = Cart::from_bytes(rom).map_err(|e| format!("{}", e))?;
 
-    let mut global_emu = EMULATOR.lock().map_err(|_| "Failed to acquire mutex")?;
-    let nes: &mut nes_core::nes::Nes<_,_> = global_emu.as_mut().ok_or("Emulator has not been initialized yet")?;
+    let mut global_emu = get_nes()?;
+    let nes = global_emu.as_mut().ok_or("Emulator has not been initialized yet")?;
     nes.insert_cartridge(cart);
 
     Ok(())
@@ -183,8 +186,8 @@ pub fn insert_cartridge(rom: Box<[u8]>) -> Result<(), JsValue> {
 
 #[wasm_bindgen]
 pub fn reset() -> Result<(), JsValue> {
-    let mut global_emu = EMULATOR.lock().map_err(|_| "Failed to acquire mutex")?;
-    let nes: &mut nes_core::nes::Nes<_,_> = global_emu.as_mut().ok_or("Emulator has not been initialized yet")?;
+    let mut global_emu = get_nes()?;
+    let nes = global_emu.as_mut().ok_or("Emulator has not been initialized yet")?;
     nes.reset();
     Ok(())
 }
@@ -200,6 +203,29 @@ pub fn key_down(button: JsValue) -> Result<(), JsValue> {
 pub fn key_up(button: JsValue) -> Result<(), JsValue> {
     let button = Button::try_from(button)?;
     CONTROLLER.buttons_up(button.into());
+    Ok(())
+}
+
+#[wasm_bindgen]
+pub fn save_state() -> Result<(), JsValue> {
+    let global_emu = get_nes()?;
+    global_emu.as_ref().map(|nes| {
+        let s = nes.save_state();
+        let mut g_s = SAVE_STATE.write().expect("Failed to write to SAVE_STATE");
+        g_s.replace(s);
+    });
+    
+    Ok(())
+}
+
+#[wasm_bindgen]
+pub fn load_state() -> Result<(), JsValue> {
+    let mut global_emu = get_nes()?;
+    global_emu.as_mut().map(|nes| {
+        let g_s = SAVE_STATE.write().expect("Failed to write to SAVE_STATE");
+        g_s.as_ref().map(|s| nes.load_state(s.clone()));
+    });
+    
     Ok(())
 }
 
@@ -227,4 +253,8 @@ fn get_canvas() -> web_sys::HtmlCanvasElement {
         .dyn_into()
         .unwrap();
     html_canvas
+}
+
+fn get_nes() -> Result<MutexGuard<'static, Option<Nes>>, JsValue> {
+    EMULATOR.lock().map_err(|_| "Failed to acquire mutex".into())
 }

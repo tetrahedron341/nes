@@ -37,6 +37,17 @@ function key_to_button(key) {
     }
 }
 
+function toggle_info() {
+    let info = document.getElementById("info");
+    let vis = info.style.display;
+    if (vis === "none") {
+        info.style.display = "inherit";
+    } else {
+        info.style.display = "none";
+    }
+}
+window.toggle_info = toggle_info;
+
 rust.then(
     m => {
         m.init_emulator();
@@ -75,6 +86,14 @@ rust.then(
 
         window.reset_emulator = function () {
             m.reset();
+        }
+
+        window.save_state = function () {
+            m.save_state();
+        }
+
+        window.load_state = function () {
+            m.load_state();
         }
 
         let fileInput = document.getElementById("rom_input");

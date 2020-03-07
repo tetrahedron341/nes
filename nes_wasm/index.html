@@ -8,6 +8,7 @@
                 flex-direction: column;
                 align-items: center;
                 background-color: grey;
+                font-family: sans-serif;
             }
             body > * {
                 margin: 5px;
@@ -35,6 +36,29 @@
             #control_panel > button:active {
                 background-color: cyan;
             }
+            #info-bg {
+                position: fixed;
+                margin: 0px;
+                width: 100%;
+                height: 100%;
+                top: 0px;
+                left: 0px;
+                opacity: 50%;
+                background-color: black;
+            }
+            #info-content {
+                position: fixed;
+                width: 60%;
+                height: 60%;
+                left: 20%;
+                top: 20%;
+                background-color: white;
+                border-style: solid;
+                border-color: black;
+                border-width: 1px;
+                border-radius: 15px;
+                padding: 15px;
+            }
         </style>
         <script src="https://kit.fontawesome.com/2947ccfe00.js" crossorigin="anonymous"></script>
     </head>
@@ -42,8 +66,34 @@
         <div id="control_panel">
             <button onclick="reset_emulator()" title="Reset"><i class="fas fa-2x fa-redo" title="Reset"></i></button>
             <button onclick="toggle_pause()" title="Pause (p)"><i id="pause_button" class="fas fa-2x fa-pause" title="Pause (p)"></i></button>
+            <button onclick="save_state()" title="Save State"><i class="fas fa-2x fa-download" title="Save State"></i></button>
+            <button onclick="load_state()" title="Load State"><i class="fas fa-2x fa-upload" title="Load State"></i></button>
+            <button onclick="toggle_info()" title="Info"><i class="fas fa-2x fa-info" title="Info"></i></button>
         </div>
         <canvas id="nes_canvas" width="512" height="480" style="image-rendering: pixelated; image-rendering: crisp-edges;"></canvas>
         <input id="rom_input" type="file" accept=".nes" />
+
+        <div id="info" style="display: none;">
+            <div id="info-bg" onclick="toggle_info()"></div>
+            <div id="info-content">
+                <i onclick="toggle_info()" class="fas fa-times" title="Close"
+                    style="position: absolute; right: 15px; top: 15px; cursor: pointer;"></i>
+                <div style="height: 100%; overflow-y: auto; margin-right: 20px">
+                    <h1>Controls</h1>
+                    <ul>
+                        <li>A -> Z</li>
+                        <li>B -> X</li>
+                        <li>Start -> H</li>
+                        <li>Select -> G</li>
+                        <li>Up, Down, Left, Right -> Arrow keys</li>
+                    </ul>
+                    <h1>How to use</h1>
+                    <p>Use the file select button at the bottom of the page to select a ROM file.</p>
+                    <p>(NOTE: Bring your own ROMs. I can't give those out because that would be illegal.)</p>
+                    <h1>Source</h1>
+                    <a href="https://github.com/bengdahl/nes/">https://github.com/bengdahl/nes/</a>
+                </div>
+            </div>
+        </div>
     </body>
 </html>

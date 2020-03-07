@@ -27,6 +27,3 @@ features = [
     'HtmlImageElement',
     'console',
 ]
-
-[profile.release]
-lto = true
