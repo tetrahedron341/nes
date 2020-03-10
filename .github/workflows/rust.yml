@@ -49,10 +49,7 @@ jobs:
       
     - name: Build frontend
       working-directory: nes_wasm
-      run: |
-        npm run build
-        rm ../docs/*
-        cp dist/* ../docs
+      run: npm run build
     
     - name: Deploy to Github Pages
       uses: peaceiris/actions-gh-pages@v3
