@@ -222,7 +222,7 @@ pub fn save_state() -> Result<(), JsValue> {
 pub fn load_state() -> Result<(), JsValue> {
     let mut global_emu = get_nes()?;
     global_emu.as_mut().map(|nes| {
-        let g_s = SAVE_STATE.write().expect("Failed to write to SAVE_STATE");
+        let g_s = SAVE_STATE.read().expect("Failed to read from SAVE_STATE");
         g_s.as_ref().map(|s| nes.load_state(s.clone()));
     });
     
