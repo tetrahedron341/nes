@@ -13,17 +13,44 @@ jobs:
 
     steps:
     - uses: actions/checkout@v2
+      with:
+          persist-credentials: false
     - name: Install SDL libraries
       run: sudo apt-get install libsdl2-dev libsdl2-ttf-dev
+      
     - name: Build
       run: cargo build --verbose
+      
     - name: Run tests
       run: cargo test --verbose
+      
+    - name: Cache npm dependencies
+      id: cache-npm
+      uses: actions/cache@v1.1.2
+      with:
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
+        path: ~/.npm
+        restore-keys: ${{ runner.os }}-node-
+
+    - name: Install npm dependencies
+      if: steps.cache-npm.outputs.cache-hit != 'true'
+      working-directory: nes_wasm
+      run: npm install
+      
+    - name: Cache wasm-pack
+      id: cache-wasm-pack
+      uses: actions/cache@v1.1.2
+      with:
+        key: ${{ runner.os }}-cargo-bin-${{ hashFiles('**/Cargo.lock') }}
+        path: ~/.cargo/bin
+      
+    - name: Install wasm-pack
+      if: steps.cache-wasm-pack.outputs.cache-hit != 'true'
+      run: cargo install wasm-pack
+      
     - name: Build frontend
       working-directory: nes_wasm
       run: |
-        cargo install wasm-pack
-        npm install
         npm run build
         rm ../docs/*
         cp dist/* ../docs
