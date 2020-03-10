@@ -53,3 +53,9 @@ jobs:
         npm run build
         rm ../docs/*
         cp dist/* ../docs
+    
+    - name: Deploy to Github Pages
+      uses: peaceiris/actions-gh-pages@v3
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        publish_dir: ./nes_wasm/dist
