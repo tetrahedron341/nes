@@ -33,7 +33,6 @@ jobs:
         restore-keys: ${{ runner.os }}-node-
 
     - name: Install npm dependencies
-      if: steps.cache-npm.outputs.cache-hit != 'true'
       working-directory: nes_wasm
       run: npm install
       
