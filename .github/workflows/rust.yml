@@ -22,6 +22,7 @@ jobs:
     - name: Build frontend
       working-directory: nes_wasm
       run: |
+        cargo install wasm-pack
         npm install
         npm run build
         rm ../docs/*
