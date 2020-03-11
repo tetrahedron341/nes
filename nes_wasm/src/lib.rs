@@ -180,6 +180,7 @@ pub fn insert_cartridge(rom: Box<[u8]>) -> Result<(), JsValue> {
     let mut global_emu = get_nes()?;
     let nes = global_emu.as_mut().ok_or("Emulator has not been initialized yet")?;
     nes.insert_cartridge(cart);
+    SAVE_STATE.write().unwrap().take();
 
     Ok(())
 }

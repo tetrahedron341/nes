@@ -12,6 +12,7 @@ const FPS = 60.0;
 
 var paused = false;
 var anim_frame_id;
+var emulator_error = false;
 
 function key_to_button(key) {
     switch (key) {
@@ -51,7 +52,34 @@ window.toggle_info = toggle_info;
 rust.then(
     m => {
         m.init_emulator();
+        
+        window.set_pause = function (p) {
+            if (p) {
+                document.getElementById("pause_button").classList.remove("fa-pause");
+                document.getElementById("pause_button").classList.add("fa-play");
+            } else {
+                document.getElementById("pause_button").classList.remove("fa-play");
+                document.getElementById("pause_button").classList.add("fa-pause");
+            }
+            paused = p;
+        }
+        
+        window.toggle_pause = function () {
+            if (!emulator_error) {
+                set_pause(!paused);
+            }
+        }
 
+        window.set_error = function (e) {
+            if (e) {
+                set_pause(true);
+                document.getElementById("pause_button").parentElement.style.backgroundColor = "salmon";
+            } else {
+                document.getElementById("pause_button").parentElement.style.backgroundColor = null;
+            }
+            emulator_error = e;
+        }
+        
         function play() {
             var fpsInterval = 1000.0 / FPS;
             var then = Date.now();
@@ -66,26 +94,28 @@ rust.then(
 
                 if (!paused && elapsed > fpsInterval) {
                     then = now - (elapsed % fpsInterval);
-                    m.advance_frame();
+                    try {
+                        m.advance_frame();
+                    } catch (e) {
+                        cancelAnimationFrame(anim_frame_id);
+                        set_pause(true);
+                        set_error(true);
+                        console.error(e);
+                        alert("An error has occured. Please reset the emulator or reload the ROM.")
+                    }
                 }
             }
 
             anim_frame_id = requestAnimationFrame(play_frame);
         }
 
-        window.toggle_pause = function () {
-            paused = !paused;
-            if (paused) {
-                document.getElementById("pause_button").classList.remove("fa-pause");
-                document.getElementById("pause_button").classList.add("fa-play");
-            } else {
-                document.getElementById("pause_button").classList.remove("fa-play");
-                document.getElementById("pause_button").classList.add("fa-pause");
-            }
-        }
-
         window.reset_emulator = function () {
             m.reset();
+            set_error(false);
+            if (anim_frame_id != undefined) {
+                cancelAnimationFrame(anim_frame_id);
+            }
+            play();
         }
 
         window.save_state = function () {
@@ -111,11 +141,7 @@ rust.then(
                 var array = new Uint8Array(arrayBuffer);
                 m.insert_cartridge(array);
                 console.log("Inserted cartridge");
-                m.reset();
-                if (anim_frame_id != undefined) {
-                    cancelAnimationFrame(anim_frame_id);
-                }
-                play();
+                reset_emulator();
             }
             reader.readAsArrayBuffer(fileInput.files[0])
         });
