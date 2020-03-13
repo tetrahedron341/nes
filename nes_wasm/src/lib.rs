@@ -8,12 +8,13 @@ use std::convert::TryFrom;
 use nes_core::{
     nes::NesSaveState,
     ppu::{VideoInterface, Color}, 
+    apu::DummyAudio,
     controller::{NESController, ControllerState},
     cart::Cart
 };
 use lazy_static::lazy_static;
 
-type Nes = nes_core::nes::Nes<CanvasOutput, &'static Controller>;
+type Nes = nes_core::nes::Nes<CanvasOutput, &'static Controller, DummyAudio>;
 
 lazy_static! {
     static ref EMULATOR: Mutex<Option<Nes>> = Mutex::new(None);

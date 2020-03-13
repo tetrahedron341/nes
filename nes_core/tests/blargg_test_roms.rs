@@ -20,7 +20,7 @@ static SPECIAL_ROM: &'static [u8] = include_bytes!("../test_roms/16-special.nes"
 fn run_blargg_test(rom: &'static [u8]) {
     let rom = Vec::from(rom);
     let cart = nes_core::cart::Cart::from_bytes(rom).unwrap();
-    let mut nes = nes_core::nes::Nes::new(cart, nes_core::ppu::DummyVideo(), nes_core::controller::DummyController(), Some(nes_core::nes::NESConfig::DEBUG));
+    let mut nes = nes_core::nes::Nes::new(cart, nes_core::ppu::DummyVideo(), nes_core::controller::DummyController(), nes_core::apu::DummyAudio(), Some(nes_core::nes::NESConfig::DEBUG));
 
     let code = loop {
         nes.master_clock_tick().unwrap();

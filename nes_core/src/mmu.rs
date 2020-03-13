@@ -2,6 +2,7 @@ use crate::cart::{Cart, Mirroring, CartState};
 use crate::mos6502::MOS6502Memory;
 use crate::ppu::PPUMemory;
 use crate::ppu::PPURegisters;
+use crate::apu::APURegisters;
 use crate::controller::NESController;
 use std::cell::Cell;
 use bitflags::bitflags;
@@ -16,7 +17,6 @@ bitflags! {
 pub struct MMUSaveState {
     ram: [u8; 2048],
     vram: [[u8; 0x400]; 4],
-    registers: [u8; 0x20],
     cart_state: Option<CartState>
 }
 
@@ -33,11 +33,6 @@ impl Clone for MMUSaveState {
                 vram.as_mut().copy_from_slice(&self.vram);
                 vram
             },
-            registers: {
-                let mut reg = [0; 0x20];
-                reg.as_mut().copy_from_slice(&self.registers);
-                reg
-            },
             cart_state: self.cart_state.as_ref().map(|c| (**c).clone())
         }
     }
@@ -47,8 +42,8 @@ pub struct MMU<C: NESController> {
     pub cart: Option<Cart>,
     pub ram: [u8; 2048],
     pub ppu_registers: PPURegisters,
+    pub apu_registers: APURegisters,
     pub vram: [[u8; 0x400]; 4],
-    pub registers: [u8; 0x20],
     pub controller: C,
     controller_shift: Cell<u8>,
 
@@ -67,7 +62,7 @@ impl<C: NESController> MMU<C> {
             cart: cart.into(),
             ram: [0; 2048],
             ppu_registers: PPURegisters::new(),
-            registers: [0; 0x20],
+            apu_registers: APURegisters::new(),
             vram: [[0; 0x400]; 4],
             controller: controller,
             controller_shift: Cell::new(0),
@@ -89,8 +84,7 @@ impl<C: NESController> MMU<C> {
 
     pub fn reset(&mut self) {
         self.cart.as_mut().map(|c| c.reset());
-        self.ram = [0; 2048];
-        self.registers = [0; 0x20];
+        // self.ram = [0; 2048];
         self.vram = [[0; 0x400]; 4];
         self.controller_shift.set(0);
         self.ppu_registers = PPURegisters::new();
@@ -108,11 +102,6 @@ impl<C: NESController> MMU<C> {
                 vram.as_mut().copy_from_slice(&self.vram);
                 vram
             },
-            registers: {
-                let mut reg = [0; 0x20];
-                reg.as_mut().copy_from_slice(&self.registers);
-                reg
-            },
             cart_state: self.cart.as_ref().map(|c| c.save_state())
         }
     }
@@ -120,7 +109,6 @@ impl<C: NESController> MMU<C> {
     pub fn load_state(&mut self, s: MMUSaveState) {
         self.ram.as_mut().copy_from_slice(&s.ram);
         self.vram.as_mut().copy_from_slice(&s.vram);
-        self.registers.as_mut().copy_from_slice(&s.registers);
         s.cart_state.map(
             |s| self.cart.as_mut().map(
                 |c| c.load_state(s)
@@ -141,7 +129,12 @@ impl<C: NESController> MMU<C> {
                 self.controller_shift.set(sh);
                 if c {1} else {0}
             },
-            (0x4000 ..= 0x401f) => self.registers[((addr-0x4000) as usize) % 0x20],
+            0x4017 => {
+                0
+            },
+            0x4000..=0x4015 | 0x4018..=0x401f => {
+                self.apu_registers.read(addr)
+            },
             (0x4020 ..= 0xffff) => self.cart.as_ref().expect("Cartridge is not inserted!").read(addr)
         }
     }
@@ -160,7 +153,9 @@ impl<C: NESController> MMU<C> {
                     self.controller_shift.set(self.controller.poll_controller().bits())
                 }
             },
-            (0x4000 ..= 0x401f) => self.registers[((addr-0x4000) as usize) % 0x20] = v,
+            0x4000..=0x4013 | 0x4015 | 0x4017..=0x401f => {
+                self.apu_registers.write(addr, v);
+            },
             (0x6000 ..= 0x61ff) if self.config.contains(MMUConfig::DEBUG) => {
                 match addr {
                     0x6001..=0x6003 => { 

@@ -39,7 +39,7 @@ impl MOS6502 {
             Y: Register(0),
             PC: Register(0),
             S: Register(0),
-            P: StatusRegister::empty(),
+            P: StatusRegister::from_bits_truncate(0b0011_0100),
             reset: false,
             nmi: false,
             irq: false,

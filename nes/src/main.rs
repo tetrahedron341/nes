@@ -4,8 +4,10 @@ extern crate sdl2;
 use sdl2::rect::Rect;
 use sdl2::event::Event;
 use sdl2::keyboard::Keycode;
+use sdl2::render::WindowCanvas;
 use nes_core::controller::ControllerState;
 use nes_core::nes::NesSaveState;
+use nes_core::apu::AudioOutput;
 use std::env;
 use std::sync::RwLock;
 
@@ -101,6 +103,20 @@ impl nes_core::controller::NESController for Controller {
     }
 }
 
+struct Audio {
+    device: sdl2::audio::AudioQueue<f32>
+}
+
+impl AudioOutput for Audio {
+    fn queue_audio(&mut self, samples: &[f32]) -> Result<(), String> {
+        self.device.queue(samples);
+        Ok(())
+    }
+    fn sample_rate(&self) -> usize {
+        self.device.spec().freq as usize
+    }
+}
+
 fn main() {
     let args = env::args().collect::<Vec<_>>();
     let rom_name = args.get(1).expect("Provide a path to a ROM as an argument.");
@@ -108,6 +124,7 @@ fn main() {
 
     let sdl_ctx = sdl2::init().unwrap();
     let video = sdl_ctx.video().unwrap();
+    let audio_ctx = sdl_ctx.audio().unwrap();
     let mut window = video.window(TITLE, GAME_WIDTH + DEBUG_WIDTH, GAME_HEIGHT)
         .opengl()
         .position_centered()
@@ -130,8 +147,17 @@ fn main() {
     
     let controller = Controller::new();
 
+    let audio = Audio { 
+        device: audio_ctx.open_queue(None, &sdl2::audio::AudioSpecDesired {
+                channels: Some(1),
+                freq: None,
+                samples: None
+            }).unwrap()
+    };
+    audio.device.resume();
+
     let cart = nes_core::cart::Cart::from_file(rom_name).unwrap();
-    let mut nes = nes_core::nes::Nes::new(cart, &screen, &controller, None);
+    let mut nes = nes_core::nes::Nes::new(cart, &screen, &controller, audio, None);
 
     let mut save_state: Option<NesSaveState> = None;
 
@@ -139,6 +165,7 @@ fn main() {
 
     let mut selected_palette = 0;
     let mut paused = false;
+    let mut muted = false;
     let mut frame_unlocked = false;
 
     let mut debug_screen = DebugScreen::new(&tc).unwrap();
@@ -146,9 +173,19 @@ fn main() {
 
     let mut fps_count = 0;
     let mut fps_timer = std::time::SystemTime::now();
-    let mut fps: f64;
+    let mut fps: f64 = 0.0;
 
     let mut nametable_viewer: Option<NametableViewer> = None;
+
+    let update_title = |canvas: &mut WindowCanvas, fps: f64, paused: bool, muted: bool, volume: f32| {
+        let vol_pct = format!("{:.0}%", 100.0 * volume / 5.0);
+        canvas
+            .window_mut()
+            .set_title(
+                &format!("{}: {}x{} FPS: {:.2} {} {}", 
+                    TITLE, GAME_WIDTH + DEBUG_WIDTH, GAME_HEIGHT, fps, if paused {"Paused"} else {""}, if muted {"Muted"} else {&vol_pct})
+                ).unwrap();
+    };
 
     canvas.set_draw_color((0,0,255));
     canvas.clear();
@@ -200,11 +237,51 @@ fn main() {
                 Event::KeyDown {keycode: Some(Keycode::LAlt), ..} |
                 Event::KeyDown {keycode: Some(Keycode::RAlt), ..} => {
                     frame_unlocked = !frame_unlocked;
+                    if frame_unlocked {
+                        nes.apu.audio_device().device.pause();
+                        nes.apu.audio_device().device.clear();
+                    } else {
+                        nes.apu.audio_device().device.resume();
+                    }
                 },
 
                 Event::KeyDown {keycode: Some(Keycode::P), ..} => {
                     paused = !paused;
+                    if paused {
+                        nes.apu.audio_device().device.clear();
+                    }
+                    update_title(&mut canvas, fps, paused, muted, nes.apu.volume);
                 },
+
+                Event::KeyDown {keycode: Some(Keycode::M), ..} => {
+                    muted = !muted;
+                    if muted {
+                        nes.apu.audio_device().device.clear();
+                        nes.apu.audio_device().device.pause();
+                    } else {
+                        nes.apu.audio_device().device.clear();
+                        nes.apu.audio_device().device.resume();
+                    }
+                    update_title(&mut canvas, fps, paused, muted, nes.apu.volume);
+                },
+
+                Event::KeyDown {keycode: Some(Keycode::Plus), ..} |
+                Event::KeyDown {keycode: Some(Keycode::Equals), keymod: sdl2::keyboard::Mod::LSHIFTMOD, ..} |
+                Event::KeyDown {keycode: Some(Keycode::Equals), keymod: sdl2::keyboard::Mod::RSHIFTMOD, ..} |
+                Event::KeyDown {keycode: Some(Keycode::KpPlus), ..} => {
+                    nes.apu.volume += 0.1;
+                    nes.apu.volume = nes.apu.volume.min(5.0);
+                    println!("Volume set to: {}", nes.apu.volume);
+                    update_title(&mut canvas, fps, paused, muted, nes.apu.volume);
+                },
+                Event::KeyDown {keycode: Some(Keycode::Minus), ..} |
+                Event::KeyDown {keycode: Some(Keycode::KpMinus), ..} => {
+                    nes.apu.volume -= 0.1;
+                    nes.apu.volume = nes.apu.volume.max(0.0);
+                    println!("Volume set to: {}", nes.apu.volume);
+                    update_title(&mut canvas, fps, paused, muted, nes.apu.volume);
+                },
+
                 Event::KeyDown {keycode: Some(Keycode::RightBracket), ..} => {
                     selected_palette += 1;
                     selected_palette %= 8;
@@ -454,15 +531,15 @@ fn main() {
 
         canvas.present();
         fps_count += 1;
-        if fps_count >= 60 {
+        if fps_count >= 65 {
             let t = fps_timer.elapsed().unwrap();
-            fps = (1.0 / t.as_secs_f64()) * 60.0;
+            fps = (1.0 / t.as_secs_f64()) * 65.0;
             fps_timer = std::time::SystemTime::now();
             fps_count = 0;
-            canvas.window_mut().set_title(&format!("{}: {}x{} FPS: {:.2} {}", TITLE, GAME_WIDTH + DEBUG_WIDTH, GAME_HEIGHT, fps, if paused {"Paused"} else {""})).unwrap();
+            update_title(&mut canvas, fps, paused, muted, nes.apu.volume);
         }
         if !frame_unlocked {
-            std::thread::sleep(std::time::Duration::from_micros(1_000_000 / 60).checked_sub(frame_start_time.elapsed().unwrap()).unwrap_or_default())
+            std::thread::sleep(std::time::Duration::from_micros(1_000_000 / 65).checked_sub(frame_start_time.elapsed().unwrap()).unwrap_or_default())
         }
     }
 }

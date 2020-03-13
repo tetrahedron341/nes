@@ -4,6 +4,7 @@ use crate::mmu::{MMU, MMUSaveState};
 use crate::cart::Cart;
 use crate::error::*;
 use crate::controller::NESController;
+use crate::apu::{APU, AudioOutput};
 use bitflags::bitflags;
 
 bitflags! {
@@ -57,25 +58,29 @@ pub struct NesSaveState {
 }
 
 /// Represents the NES system.
-pub struct Nes<V: VideoInterface, C: NESController> {
+pub struct Nes<V: VideoInterface, C: NESController, A: AudioOutput> {
     pub cpu: MOS6502,
     pub ppu: PPU,
     pub mmu: MMU<C>,
+    pub apu: APU<A>,
     screen: NesVideoWrapper<V>,
     cycles_counter: u32,
     oam_write: Option<u8>,
     _config: NESConfig
 }
 
-impl<'a, V: VideoInterface, C: NESController> Nes<V,C> {
-    pub fn new<T: Into<Option<Cart>>>(cart: T, screen: V, controller: C, config: Option<NESConfig>) -> Self {
+impl<'a, V: VideoInterface, C: NESController, A: AudioOutput> Nes<V,C,A> {
+    pub fn new<T: Into<Option<Cart>>>(cart: T, screen: V, controller: C, audio: A, config: Option<NESConfig>) -> Self {
         let mut cpu = MOS6502::new(config.as_ref().map(|c| c.into()));
         cpu.reset();
         let ppu = PPU::new();
+        let apu = APU::new(audio);
         let mmu = MMU::new(cart, controller, config.as_ref().map(|c| c.into()));
+
         Nes {
             cpu,
             ppu,
+            apu,
             mmu,
             screen: NesVideoWrapper{screen, frame_completed: std::cell::Cell::new(false)},
             cycles_counter: 0,
@@ -87,6 +92,7 @@ impl<'a, V: VideoInterface, C: NESController> Nes<V,C> {
     pub fn reset(&mut self) {
         self.cpu.reset();
         self.mmu.reset();
+        self.apu.reset();
     }
 
     pub fn save_state(&self) -> NesSaveState {
@@ -125,6 +131,8 @@ impl<'a, V: VideoInterface, C: NESController> Nes<V,C> {
             if self.ppu.nmi {
                 self.cpu.nmi();
                 self.ppu.nmi = false;
+            } else if self.apu.get_irq() {
+                self.cpu.irq();
             }
             if self.cycles_counter == 0 {
                 self.cycles_counter += self.cpu.tick(&mut self.mmu)?;
@@ -135,6 +143,9 @@ impl<'a, V: VideoInterface, C: NESController> Nes<V,C> {
         self.ppu.tick(&mut self.mmu, &mut self.screen);
         self.ppu.tick(&mut self.mmu, &mut self.screen);
         self.ppu.tick(&mut self.mmu, &mut self.screen);
+        self.apu.tick(&mut self.mmu.apu_registers);
+        self.apu.tick(&mut self.mmu.apu_registers);
+        self.apu.tick(&mut self.mmu.apu_registers);
         
         Ok(())
     }

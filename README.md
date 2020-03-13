@@ -13,10 +13,11 @@ Yep
 * Shits the bed if it even looks at an illegal opcode
 
 ## PPU
-* (mostly) Accurate emulation of both sprites and backround
+* (mostly) Accurate emulation of both sprites and background
 
 ## APU
-* doesn't exist
+* Has square channels #1 and #2
+* Makes funky popping noises
 
 ## Mapper list
 * NROM (0)

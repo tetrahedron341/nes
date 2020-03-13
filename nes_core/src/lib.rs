@@ -10,5 +10,6 @@ pub mod mapper;
 pub mod mmu;
 pub mod controller;
 pub mod nes_builder;
+pub mod apu;
 
 pub use nes_builder::nes_builder;
