@@ -368,7 +368,9 @@ fn main() {
         }
 
         if !paused {
-            nes.run_frame().expect("CPU Error");
+            if let Err(e) = nes.run_frame() {
+                panic!("{}", e);
+            };
             {
                 let txt = screen.txt.read().unwrap();
                 canvas.copy(
