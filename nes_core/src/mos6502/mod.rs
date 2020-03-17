@@ -28,6 +28,10 @@ pub struct MOS6502 {
     nmi: bool,
     irq: bool,
 
+    // Updates to the IRQ disable flag are delayed by an instruction.
+    // This stores the previous state of `I` after an update, and is cleared every instruction.
+    irq_lag: Option<bool>,
+
     config: CPUConfig
 }
 
@@ -38,11 +42,13 @@ impl MOS6502 {
             X: Register(0),
             Y: Register(0),
             PC: Register(0),
-            S: Register(0),
+            S: Register(0xfd),
             P: StatusRegister::from_bits_truncate(0b0011_0100),
             reset: false,
             nmi: false,
             irq: false,
+
+            irq_lag: None,
             
             config: config.unwrap_or(CPUConfig::empty())
         }
@@ -77,13 +83,26 @@ impl MOS6502 {
             self.push_byte(self.P.bits() | 0b0010_0000, mmu);
             self.PC.set(mmu.read_double(0xFFFA));
             self.nmi = false;
-        } else if self.irq && !self.P.contains(StatusRegister::I) {
-            self.push_byte(self.PC.hi(), mmu);
-            self.push_byte(self.PC.lo(), mmu);
-            self.push_byte(self.P.bits() | 0b0010_0000, mmu);
-            self.P.insert(StatusRegister::I);
-            self.PC.set(mmu.read_double(0xFFFE));
+        } else if self.irq {
+            // Updates to `I` are lagged by one instruction
+            let irq_disabled = if let Some(lag) = self.irq_lag.take() {
+                lag
+            } else {
+                self.P.contains(StatusRegister::I)
+            };
+
+            if !irq_disabled {
+                self.push_byte(self.PC.hi(), mmu);
+                self.push_byte(self.PC.lo(), mmu);
+                self.push_byte(self.P.bits() | 0b0010_0000, mmu);
+                self.P.insert(StatusRegister::I);
+                self.PC.set(mmu.read_double(0xFFFE));
+
+                self.irq = false;
+            }
         }
+
+        self.irq_lag.take();
 
         let mut pc_temp = self.PC;
         let opcode = fetch_byte(&mut pc_temp, mmu);
@@ -350,6 +369,7 @@ impl MOS6502 {
             },
             PLP => {
                 let p = self.pull_byte(mmu) & (0b11001111);
+                self.irq_lag = Some(self.P.contains(StatusRegister::I));
                 self.P = StatusRegister::from_bits_truncate(p);
             },
             RTI => {
@@ -371,6 +391,7 @@ impl MOS6502 {
                 self.P.insert(StatusRegister::D);
             },
             SEI => {
+                self.irq_lag = Some(self.P.contains(StatusRegister::I));
                 self.P.insert(StatusRegister::I);
             },
             CLC => {
@@ -380,6 +401,7 @@ impl MOS6502 {
                 self.P.remove(StatusRegister::D);
             },
             CLI => {
+                self.irq_lag = Some(self.P.contains(StatusRegister::I));
                 self.P.remove(StatusRegister::I);
             },
             CLV => {

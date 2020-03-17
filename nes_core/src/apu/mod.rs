@@ -114,7 +114,7 @@ impl<T: AudioOutput> APU<T> {
                                     self.frame_irq = true;
                                 }
                             },
-                            _ => unreachable!()
+                            _ => unreachable!("Frame seq mode 0 invalid step: {}", self.frame_seq)
                         }
                         self.frame_seq += 1;
                         self.frame_seq %= 4;
@@ -133,7 +133,7 @@ impl<T: AudioOutput> APU<T> {
                                 self.pulse_2.tick_envelope();
                             },
                             4 => {},
-                            _ => unreachable!()
+                            _ => unreachable!("Frame seq mode 1 invalid step: {}", self.frame_seq)
                         }
                         self.frame_seq += 1;
                         self.frame_seq %= 5;
@@ -178,24 +178,25 @@ impl<T: AudioOutput> APU<T> {
     }
 
     fn update_from_registers(&mut self, registers: &mut APURegisters) {
-        if let Some((addr, is_write)) = registers.last_access.get() {
+        if let Some(addr) = registers.last_write.get() {
             match addr {
                 0..=3 => self.pulse_1.write_to_registers(addr, registers.registers[addr]),
                 4..=7 => self.pulse_2.write_to_registers(addr - 4, registers.registers[addr]),
 
-                0x15 if is_write => {
+                0x15 => {
                     let v = registers.registers[0x15];
                     self.pulse_1.enabled = v & 0b0000_0001 != 0;
                     if !self.pulse_1.enabled { self.pulse_1.disable() }
                     self.pulse_2.enabled = v & 0b0000_0010 != 0;
                     if !self.pulse_2.enabled { self.pulse_2.disable() }
                 },
-                0x15 if !is_write => {
-                    self.frame_irq = false;
-                },
-                0x17 if is_write => {
+                0x17 => {
                     let v = registers.registers[0x17];
+                    let old_f_s_m = self.frame_seq_mode;
                     self.frame_seq_mode = v & 0b1000_0000 != 0;
+                    if old_f_s_m != self.frame_seq_mode {
+                        self.frame_seq = 0;
+                    }
                     if v & 0b1000_0000 != 0 {
                         self.pulse_1.tick_envelope();
                         self.pulse_2.tick_envelope();
@@ -211,6 +212,15 @@ impl<T: AudioOutput> APU<T> {
                 _ => ()
             }
         }
+        
+        if let Some(addr) = registers.last_read.get() {
+            match addr {
+                0x15 => {
+                    self.frame_irq = false;
+                },
+                _ => ()
+            }
+        }
 
         // Update the status register
         let mut status = 0u8;
@@ -220,7 +230,8 @@ impl<T: AudioOutput> APU<T> {
 
         registers.status_out = status;
 
-        registers.last_access.set(None);
+        registers.last_read.set(None);
+        registers.last_write.set(None);
     }
 
     // https://wiki.nesdev.com/w/index.php/APU_Mixer
