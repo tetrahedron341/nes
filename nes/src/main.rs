@@ -157,7 +157,7 @@ fn main() {
     audio.device.resume();
 
     let cart = nes_core::cart::Cart::from_file(rom_name).unwrap();
-    let mut nes = nes_core::nes::Nes::new(cart, &screen, &controller, audio, Some(nes_core::nes::NESConfig::DEBUG));
+    let mut nes = nes_core::nes::Nes::new(cart, &screen, &controller, audio, None);
 
     let mut save_state: Option<NesSaveState> = None;
 
@@ -293,8 +293,8 @@ fn main() {
                     update_debug = true;
                 },
                 Event::KeyDown {keycode: Some(Keycode::O), ..} => {
-                    // println!("{}", nes.ppu.print_oam());
-                    println!("{}", std::str::from_utf8(nes.mmu.blargg_debug_text()).unwrap())
+                    println!("{}", nes.ppu.print_oam());
+                    // println!("{}", std::str::from_utf8(nes.mmu.blargg_debug_text()).unwrap())
                 },
                 Event::KeyDown {keycode: Some(Keycode::R), ..} => {
                     println!("{:X?}", nes.mmu.ppu_registers);
