@@ -4,7 +4,16 @@ const webpack = require('webpack');
 const WasmPackPlugin = require("@wasm-tool/wasm-pack-plugin");
 
 module.exports = {
-    entry: './index.js',
+    entry: './index.ts',
+    module: {
+        rules: [
+            {
+                test: /\.tsx?$/,
+                use: 'ts-loader',
+                exclude: /node_modules/,
+            },
+        ],
+    },
     output: {
         path: path.resolve(__dirname, 'dist'),
         filename: 'index.js',

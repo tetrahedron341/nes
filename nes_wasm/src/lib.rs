@@ -2,47 +2,53 @@
 
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use std::sync::{Mutex, MutexGuard};
 use std::sync::RwLock;
 use std::convert::TryFrom;
 use nes_core::{
-    nes::NesSaveState,
     ppu::{VideoInterface, Color}, 
-    apu::DummyAudio,
+    apu::AudioOutput,
     controller::{NESController, ControllerState},
     cart::Cart
 };
-use lazy_static::lazy_static;
 
-type Nes = nes_core::nes::Nes<CanvasOutput, &'static Controller, DummyAudio>;
-
-lazy_static! {
-    static ref EMULATOR: Mutex<Option<Nes>> = Mutex::new(None);
-    static ref CONTROLLER: Controller = Controller::new();
-    static ref SAVE_STATE: RwLock<Option<NesSaveState>> = RwLock::new(None);
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_name = "queueAudio")]
+    fn queue_audio(samples: Box<[f32]>);
 }
 
+#[wasm_bindgen(start, skip_typescript)]
+pub fn initialize() {
+    console_error_panic_hook::set_once();
+}
+
+#[wasm_bindgen]
+pub struct Nes (nes_core::nes::Nes<CanvasOutput, Controller, Audio>);
+
+#[wasm_bindgen]
+pub struct NesSaveState (nes_core::nes::NesSaveState);
+
 struct Controller {
-    buttons: RwLock<ControllerState>
+    buttons: ControllerState
 }
 
 impl Controller {
     fn new() -> Self {
         Controller {
-            buttons: RwLock::new(ControllerState::empty())
+            buttons: ControllerState::empty()
         }
     }
-    fn buttons_down(&self, buttons: ControllerState) {
-        self.buttons.write().unwrap().insert(buttons);
+    fn buttons_down(&mut self, buttons: ControllerState) {
+        self.buttons.insert(buttons);
     }
-    fn buttons_up(&self, buttons: ControllerState) {
-        self.buttons.write().unwrap().remove(buttons);
+    fn buttons_up(&mut self, buttons: ControllerState) {
+        self.buttons.remove(buttons);
     }
 }
 
 impl NESController for Controller {
     fn poll_controller(&self) -> ControllerState {
-        *self.buttons.read().unwrap()
+        self.buttons
     }
 }
 
@@ -118,10 +124,7 @@ impl VideoInterface for CanvasOutput {
         }
         let offset1 = (2*y as usize*512 + 2*x as usize) * 4;
         let offset2 = ((2*y as usize + 1)*512 + 2*x as usize) * 4;
-        let mut frame = self.frame.write().unwrap_or_else(|_| {
-            web_sys::console::log_1(&"Failed to lock write access".into());
-            panic!();
-        });
+        let mut frame = self.frame.write().unwrap();
         frame[offset1 + 0] = color.0;
         frame[offset1 + 1] = color.1;
         frame[offset1 + 2] = color.2;
@@ -141,94 +144,102 @@ impl VideoInterface for CanvasOutput {
     }
     fn end_of_frame(&self) {
         let ctx = get_canvas_context();
-        let mut frame = self.frame.write().expect_throw("Failed to lock mutex");
-        let clamped = wasm_bindgen::Clamped(&mut frame[..]);
+        let frame = self.frame.read().unwrap();
+        let mut frame_copy = {
+            let mut _fc = [0 ; 512 * 480 * 4];
+            assert!(frame.len() == 512 * 480 * 4);
+            _fc.copy_from_slice(&frame[..512 * 480 * 4]);
+            _fc
+        };
+        let clamped = wasm_bindgen::Clamped(&mut frame_copy[..]);
         let image_data = web_sys::ImageData::new_with_u8_clamped_array(clamped, 512).unwrap();
         ctx.put_image_data(&image_data, 0.,0.).unwrap();
     }
 }
 
 #[wasm_bindgen]
-pub fn init_emulator() -> Result<(), JsValue> {
-    console_error_panic_hook::set_once();
+pub struct Audio {
+    
+}
+
+#[wasm_bindgen]
+impl Audio {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> Self {
+        Audio {
+
+        }
+    }
+}
+
+impl AudioOutput for Audio {
+    fn queue_audio(&mut self, samples: &[f32]) -> Result<(), String> {
+        let samples = Box::from(samples);
+
+        queue_audio(samples);
+
+        Ok(())
+    }
+    fn sample_rate(&self) -> usize {
+        44100
+    }
+}
+
+#[wasm_bindgen]
+pub fn init_emulator(audio: Audio) -> Result<Nes, JsValue> {
     let canvas = CanvasOutput { frame: RwLock::new(vec!(0 ; 512 * 480 * 4)) };
+    let controller = Controller { buttons: ControllerState::empty() };
     let nes = nes_core::nes_builder()
         .video(canvas)
-        .controller(&*CONTROLLER)
+        .controller(controller)
+        .audio(audio)
         .build(None,None);
-
-    let mut global_emu = get_nes()?;
-    global_emu.replace(nes);
     
-    Ok(())
+    Ok(Nes(nes))
 }
 
 #[wasm_bindgen]
-pub fn advance_frame() -> Result<(), JsValue> {
-    let mut global_emu = get_nes()?;
-    let nes = global_emu.as_mut().ok_or("Emulator has not been initialized yet")?;
-
-    nes.run_frame().map_err(|e| format!("{}", e))?;
-
-    Ok(())
+pub fn advance_frame(nes: &mut Nes) -> Result<(), JsValue> {
+    nes.0.run_frame().map_err(|e| format!("{}", e).into())
 }
 
 #[wasm_bindgen]
-pub fn insert_cartridge(rom: Box<[u8]>) -> Result<(), JsValue> {
+pub fn insert_cartridge(nes: &mut Nes, rom: Box<[u8]>) -> Result<(), JsValue> {
     let rom = rom.into_vec();
     let cart = Cart::from_bytes(rom).map_err(|e| format!("{}", e))?;
 
-    let mut global_emu = get_nes()?;
-    let nes = global_emu.as_mut().ok_or("Emulator has not been initialized yet")?;
-    nes.insert_cartridge(cart);
-    SAVE_STATE.write().unwrap().take();
+    nes.0.insert_cartridge(cart);
 
     Ok(())
 }
 
 #[wasm_bindgen]
-pub fn reset() -> Result<(), JsValue> {
-    let mut global_emu = get_nes()?;
-    let nes = global_emu.as_mut().ok_or("Emulator has not been initialized yet")?;
-    nes.reset();
-    Ok(())
+pub fn reset(nes: &mut Nes) {
+    nes.0.reset();
 }
 
 #[wasm_bindgen]
-pub fn key_down(button: JsValue) -> Result<(), JsValue> {
+pub fn key_down(nes: &mut Nes, button: JsValue) -> Result<(), JsValue> {
     let button = Button::try_from(button)?;
-    CONTROLLER.buttons_down(button.into());
+    nes.0.mmu.controller.buttons_down(button.into());
     Ok(())
 }
 
 #[wasm_bindgen]
-pub fn key_up(button: JsValue) -> Result<(), JsValue> {
+pub fn key_up(nes: &mut Nes, button: JsValue) -> Result<(), JsValue> {
     let button = Button::try_from(button)?;
-    CONTROLLER.buttons_up(button.into());
+    nes.0.mmu.controller.buttons_up(button.into());
     Ok(())
 }
 
 #[wasm_bindgen]
-pub fn save_state() -> Result<(), JsValue> {
-    let global_emu = get_nes()?;
-    global_emu.as_ref().map(|nes| {
-        let s = nes.save_state();
-        let mut g_s = SAVE_STATE.write().expect("Failed to write to SAVE_STATE");
-        g_s.replace(s);
-    });
-    
-    Ok(())
+pub fn save_state(nes: &Nes) -> NesSaveState {
+    NesSaveState(nes.0.save_state())
 }
 
 #[wasm_bindgen]
-pub fn load_state() -> Result<(), JsValue> {
-    let mut global_emu = get_nes()?;
-    global_emu.as_mut().map(|nes| {
-        let g_s = SAVE_STATE.read().expect("Failed to read from SAVE_STATE");
-        g_s.as_ref().map(|s| nes.load_state(s.clone()));
-    });
-    
-    Ok(())
+pub fn load_state(nes: &mut Nes, s: NesSaveState) {
+    nes.0.load_state(s.0);
 }
 
 fn get_canvas_context() -> web_sys::CanvasRenderingContext2d {
@@ -255,8 +266,4 @@ fn get_canvas() -> web_sys::HtmlCanvasElement {
         .dyn_into()
         .unwrap();
     html_canvas
-}
-
-fn get_nes() -> Result<MutexGuard<'static, Option<Nes>>, JsValue> {
-    EMULATOR.lock().map_err(|_| "Failed to acquire mutex".into())
 }
