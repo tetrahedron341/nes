@@ -26,6 +26,7 @@ pub fn initialize() {
 pub struct Nes (nes_core::nes::Nes<CanvasOutput, Controller, Audio>);
 
 #[wasm_bindgen]
+#[derive(Clone)]
 pub struct NesSaveState (nes_core::nes::NesSaveState);
 
 struct Controller {
@@ -238,8 +239,8 @@ pub fn save_state(nes: &Nes) -> NesSaveState {
 }
 
 #[wasm_bindgen]
-pub fn load_state(nes: &mut Nes, s: NesSaveState) {
-    nes.0.load_state(s.0);
+pub fn load_state(nes: &mut Nes, s: &NesSaveState) {
+    nes.0.load_state(s.0.clone());
 }
 
 fn get_canvas_context() -> web_sys::CanvasRenderingContext2d {
