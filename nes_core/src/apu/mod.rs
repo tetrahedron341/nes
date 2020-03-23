@@ -100,25 +100,15 @@ impl<T: AudioOutput> APU<T> {
                     false => {
                         match self.frame_seq {
                             0 | 2 => {
-                                self.pulse_1.tick_envelope();
-                                self.pulse_2.tick_envelope();
-                                self.triangle.tick_lin_ctr();
+                                self.tick_envelope_and_lin_ctr();
                             },
                             1 => {
-                                self.pulse_1.tick_envelope();
-                                self.pulse_2.tick_envelope();
-                                self.triangle.tick_lin_ctr();
-                                self.pulse_1.tick_length_and_sweep();
-                                self.pulse_2.tick_length_and_sweep();
-                                self.triangle.tick_length();
+                                self.tick_envelope_and_lin_ctr();
+                                self.tick_length_counters();
                             },
                             3 => {
-                                self.pulse_1.tick_envelope();
-                                self.pulse_2.tick_envelope();
-                                self.triangle.tick_lin_ctr();
-                                self.pulse_1.tick_length_and_sweep();
-                                self.pulse_2.tick_length_and_sweep();
-                                self.triangle.tick_length();
+                                self.tick_envelope_and_lin_ctr();
+                                self.tick_length_counters();
                                 if !self.irq_inhibit {
                                     self.frame_irq = true;
                                 }
@@ -132,17 +122,11 @@ impl<T: AudioOutput> APU<T> {
                     true => {
                         match self.frame_seq {
                             0 | 2 => {
-                                self.pulse_1.tick_envelope();
-                                self.pulse_2.tick_envelope();
-                                self.triangle.tick_lin_ctr();
-                                self.pulse_1.tick_length_and_sweep();
-                                self.pulse_2.tick_length_and_sweep();
-                                self.triangle.tick_length();
+                                self.tick_envelope_and_lin_ctr();
+                                self.tick_length_counters();
                             },
                             1 | 3 => {
-                                self.pulse_1.tick_envelope();
-                                self.pulse_2.tick_envelope();
-                                self.triangle.tick_lin_ctr();
+                                self.tick_envelope_and_lin_ctr();
                             },
                             4 => {},
                             _ => unreachable!("Frame seq mode 1 invalid step: {}", self.frame_seq)
@@ -175,6 +159,18 @@ impl<T: AudioOutput> APU<T> {
             }
             self.sample_divider += 5_369_318.0 / self.sample_out.sample_rate() as f64; // Try to generate samples at the sample rate
         }
+    }
+
+    fn tick_envelope_and_lin_ctr(&mut self) {
+        self.pulse_1.tick_envelope();
+        self.pulse_2.tick_envelope();
+        self.triangle.tick_lin_ctr();
+    }
+
+    fn tick_length_counters(&mut self) {
+        self.pulse_1.tick_length_and_sweep();
+        self.pulse_2.tick_length_and_sweep();
+        self.triangle.tick_length();
     }
 
     pub fn reset(&mut self) {
@@ -216,12 +212,8 @@ impl<T: AudioOutput> APU<T> {
                         self.frame_seq = 0;
                     }
                     if v & 0b1000_0000 != 0 {
-                        self.pulse_1.tick_envelope();
-                        self.pulse_2.tick_envelope();
-                        self.triangle.tick_lin_ctr();
-                        self.pulse_1.tick_length_and_sweep();
-                        self.pulse_2.tick_length_and_sweep();
-                        self.triangle.tick_length();
+                        self.tick_envelope_and_lin_ctr();
+                        self.tick_length_counters();
                     }
                     if v & 0b0100_0000 != 0 {
                         self.frame_irq = false;
