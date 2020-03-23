@@ -99,7 +99,6 @@ impl Triangle {
     }
 
     pub fn disable(&mut self) {
-        println!("disabled");
         self.len_ctr.set_zero();
     }
 
