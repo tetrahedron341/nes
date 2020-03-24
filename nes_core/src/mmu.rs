@@ -44,7 +44,7 @@ pub struct MMU<C: NESController> {
     pub ppu_registers: PPURegisters,
     pub apu_registers: APURegisters,
     pub vram: [[u8; 0x400]; 4],
-    pub controller: C,
+    pub(crate) controller: C,
     controller_shift: Cell<u8>,
 
     pub oam_transfer: bool,

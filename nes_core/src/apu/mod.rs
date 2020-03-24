@@ -189,7 +189,12 @@ impl<T: AudioOutput> APU<T> {
         self.frame_irq
     }
 
-    pub fn audio_device(&mut self) -> &mut T {
+    #[inline]
+    pub(crate) fn audio_device(&self) -> &T {
+        &self.sample_out
+    }
+    #[inline]
+    pub(crate) fn audio_device_mut(&mut self) -> &mut T {
         &mut self.sample_out
     }
 

@@ -206,6 +206,34 @@ impl<'a, V: VideoInterface, C: NESController, A: AudioOutput> Nes<V,C,A> {
         }
         buf
     }
+
+
+    #[inline]
+    pub fn get_screen(&self) -> &V {
+        &self.screen.screen
+    }
+    #[inline]
+    pub fn get_screen_mut(&mut self) -> &mut V {
+        &mut self.screen.screen
+    }
+    
+    #[inline]
+    pub fn get_audio_device(&self) -> &A {
+        self.apu.audio_device()
+    }
+    #[inline]
+    pub fn get_audio_device_mut(&mut self) -> &mut A {
+        self.apu.audio_device_mut()
+    }
+
+    #[inline]
+    pub fn get_controller(&self) -> &C {
+        &self.mmu.controller
+    }
+    #[inline]
+    pub fn get_controller_mut(&mut self) -> &mut C {
+        &mut self.mmu.controller
+    }
 }
 
 // #[cfg(test)]

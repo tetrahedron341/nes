@@ -222,14 +222,14 @@ pub fn reset(nes: &mut Nes) {
 #[wasm_bindgen]
 pub fn key_down(nes: &mut Nes, button: JsValue) -> Result<(), JsValue> {
     let button = Button::try_from(button)?;
-    nes.0.mmu.controller.buttons_down(button.into());
+    nes.0.get_controller_mut().buttons_down(button.into());
     Ok(())
 }
 
 #[wasm_bindgen]
 pub fn key_up(nes: &mut Nes, button: JsValue) -> Result<(), JsValue> {
     let button = Button::try_from(button)?;
-    nes.0.mmu.controller.buttons_up(button.into());
+    nes.0.get_controller_mut().buttons_up(button.into());
     Ok(())
 }
 
