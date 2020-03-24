@@ -5,6 +5,7 @@ mod length_counter;
 mod sweep;
 mod pulse;
 mod triangle;
+mod noise;
 
 pub use audio_output::*;
 pub use apu_registers::APURegisters;
@@ -13,6 +14,7 @@ use crate::error::Result;
 use std::collections::VecDeque;
 use pulse::Pulse;
 use triangle::Triangle;
+use noise::Noise;
 
 const SAMPLE_OUT: usize = 4096;
 
@@ -24,6 +26,7 @@ pub struct APU<T: AudioOutput> {
     pulse_1: Pulse,
     pulse_2: Pulse,
     triangle: Triangle,
+    noise: Noise,
 
     quarter_frame_divider: u32,
     frame_seq_mode: bool,
@@ -47,6 +50,7 @@ impl<T: AudioOutput> APU<T> {
             pulse_1: Pulse::new(0),
             pulse_2: Pulse::new(1),
             triangle: Triangle::new(),
+            noise: Noise::new(),
 
             quarter_frame_divider: QUARTER_FRAME_DIVIDER_PERIOD,
             frame_seq_mode: false,
@@ -146,6 +150,7 @@ impl<T: AudioOutput> APU<T> {
                 self.pulse_1.tick_timer();
                 self.pulse_2.tick_timer();
                 self.triangle.tick_timer();
+                self.noise.tick_timer();
                 self.timer_div = 2;
             }
         }
@@ -165,12 +170,14 @@ impl<T: AudioOutput> APU<T> {
         self.pulse_1.tick_envelope();
         self.pulse_2.tick_envelope();
         self.triangle.tick_lin_ctr();
+        self.noise.tick_envelope();
     }
 
     fn tick_length_counters(&mut self) {
         self.pulse_1.tick_length_and_sweep();
         self.pulse_2.tick_length_and_sweep();
         self.triangle.tick_length();
+        self.noise.tick_length();
     }
 
     pub fn reset(&mut self) {
@@ -190,10 +197,16 @@ impl<T: AudioOutput> APU<T> {
         if let Some(addr) = registers.last_write.get() {
             match addr {
                 0..=3 => self.pulse_1.write_to_registers(addr, registers.registers[addr]),
+
                 4..=7 => self.pulse_2.write_to_registers(addr - 4, registers.registers[addr]),
+
                 0x8 => self.triangle.write_to_registers(0, registers.registers[addr]),
                 0xa => self.triangle.write_to_registers(1, registers.registers[addr]),
                 0xb => self.triangle.write_to_registers(2, registers.registers[addr]),
+
+                0xc => self.noise.write_to_registers(0, registers.registers[addr]),
+                0xe => self.noise.write_to_registers(1, registers.registers[addr]),
+                0xf => self.noise.write_to_registers(2, registers.registers[addr]),
 
                 0x15 => {
                     let v = registers.registers[0x15];
@@ -203,6 +216,8 @@ impl<T: AudioOutput> APU<T> {
                     if !self.pulse_2.enabled { self.pulse_2.disable() }
                     self.triangle.enabled = v & 0b0000_0100 != 0;
                     if !self.triangle.enabled { self.triangle.disable() }
+                    self.noise.enabled = v & 0b0000_1000 != 0;
+                    if !self.noise.enabled { self.noise.disable() }
                 },
                 0x17 => {
                     let v = registers.registers[0x17];
@@ -239,6 +254,7 @@ impl<T: AudioOutput> APU<T> {
         status |= if self.pulse_1.length_counter_gt_zero() { 1<<0 } else { 0 };
         status |= if self.pulse_2.length_counter_gt_zero() { 1<<1 } else { 0 };
         status |= if self.triangle.length_counter_gt_zero() { 1<<2 } else { 0 };
+        status |= if self.noise.length_counter_gt_zero() { 1<<3 } else { 0 };
         status |= if !self.irq_inhibit && self.frame_irq { 1<<6 } else { 0 };
 
         registers.status_out = status;
@@ -252,7 +268,7 @@ impl<T: AudioOutput> APU<T> {
         let p1 = if self.pulse_1.enabled {self.pulse_1.digital_sample() as f32} else {0.0};
         let p2 = if self.pulse_2.enabled {self.pulse_2.digital_sample() as f32} else {0.0};
         let t = self.triangle.digital_sample() as f32;
-        let _n = 0 as f32;
+        let n = self.noise.digital_sample() as f32;
         let _d = 0 as f32;
         
         let mut square_out = 95.88 / (8128.0/ (p1+p2) + 100.0);
@@ -260,7 +276,7 @@ impl<T: AudioOutput> APU<T> {
             square_out = 0.0;
         }
 
-        let mut tnd_out = 159.79 / (1.0 / (t/8227.0 + _n/12241.0 + _d/22638.0) + 100.0);
+        let mut tnd_out = 159.79 / (1.0 / (t/8227.0 + n/12241.0 + _d/22638.0) + 100.0);
         if !tnd_out.is_normal() {
             tnd_out = 0.0;
         }

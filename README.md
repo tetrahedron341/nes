@@ -18,6 +18,7 @@ Yep
 ## APU
 * Has square channels #1 and #2
 * Has the triangle channel
+* Has the noise channel
 * Makes funky popping noises
 
 ## Mapper list
