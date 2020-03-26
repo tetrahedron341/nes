@@ -34,7 +34,7 @@ impl Sweep {
     }
 
     pub fn is_muted(&self, raw_timer_period: u16) -> bool {
-        self.calculate_new_period(raw_timer_period) > 0x7ff || raw_timer_period < 8
+        self.calculate_new_period(raw_timer_period) as i16 > 0x7ff || raw_timer_period < 8
     }
 
     pub fn tick(&mut self, register_two_write: bool, timer_period: &mut u16) {
