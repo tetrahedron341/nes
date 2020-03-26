@@ -105,6 +105,8 @@ pub fn run(rom_name: String) {
                         break 'running
                     } else if Some(window_id) == nametable_viewer.as_ref().map(|nt_v| nt_v.window_id) {
                         nametable_viewer.take();
+                    } else if Some(window_id) == debug_screen.as_ref().map(|db| db.window_id) {
+                        debug_screen.take();
                     }
                 },
                 Event::Window {win_event, window_id, ..} => {
@@ -115,6 +117,8 @@ pub fn run(rom_name: String) {
                                 break 'running
                             } else if Some(window_id) == nametable_viewer.as_ref().map(|nt_v| nt_v.window_id) {
                                 nametable_viewer.take();
+                            } else if Some(window_id) == debug_screen.as_ref().map(|db| db.window_id) {
+                                debug_screen.take();
                             }
                         },
                         _ => ()
