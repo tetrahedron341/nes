@@ -14,7 +14,7 @@ use nes_core::{
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_name = "queueAudio")]
-    fn queue_audio(samples: Box<[f32]>);
+    fn queue_audio(samples: &mut [f32]);
 }
 
 #[wasm_bindgen(start, skip_typescript)]
@@ -174,9 +174,7 @@ impl Audio {
 }
 
 impl AudioOutput for Audio {
-    fn queue_audio(&mut self, samples: &[f32]) -> Result<(), String> {
-        let samples = Box::from(samples);
-
+    fn queue_audio(&mut self, samples: &mut [f32]) -> Result<(), String> {
         queue_audio(samples);
 
         Ok(())

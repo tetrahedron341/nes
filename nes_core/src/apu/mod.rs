@@ -11,7 +11,6 @@ pub use audio_output::*;
 pub use apu_registers::APURegisters;
 
 use crate::error::Result;
-use std::collections::VecDeque;
 use pulse::Pulse;
 use triangle::Triangle;
 use noise::Noise;
@@ -34,7 +33,7 @@ pub struct APU<T: AudioOutput> {
 
     timer_div: u8,
 
-    sample_buffer: VecDeque<f32>,
+    sample_buffer: Vec<f32>,
     sample_out: T,
     sample_divider: f64,
 
@@ -58,7 +57,7 @@ impl<T: AudioOutput> APU<T> {
 
             timer_div: 0,
 
-            sample_buffer: VecDeque::with_capacity(2*SAMPLE_OUT),
+            sample_buffer: Vec::with_capacity(2*SAMPLE_OUT),
             sample_out: output,
             sample_divider: 0.0,
 
@@ -158,7 +157,7 @@ impl<T: AudioOutput> APU<T> {
         // Use the sample divider to calculate when to generate samples
         self.sample_divider -= 1.0;
         if self.sample_divider.is_sign_negative() {
-            self.sample_buffer.push_back(self.single_sample());
+            self.sample_buffer.push(self.single_sample());
             if self.sample_buffer.len() > SAMPLE_OUT {
                 self.queue_samples().unwrap();
             }
@@ -290,8 +289,8 @@ impl<T: AudioOutput> APU<T> {
     }
 
     fn queue_samples(&mut self) -> Result<()> {
-        let samples = self.sample_buffer.drain(..).collect::<Vec<_>>();
-        self.sample_out.queue_audio(&samples[..])?;
+        self.sample_out.queue_audio(&mut self.sample_buffer[..])?;
+        self.sample_buffer.clear();
         Ok(())
     }
 }
