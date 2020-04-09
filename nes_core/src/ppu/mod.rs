@@ -491,12 +491,12 @@ impl PPU {
                         self.write_vram(self.vram_addr, chr.registers().ppu_data, chr);
                     }
 
+                    chr.registers_mut().ppu_data = self.read_vram(self.vram_addr, chr);
                     if chr.registers().ppu_ctrl & 0b0000_0100 != 0 {
                         self.vram_addr += 32;
                     } else {
                         self.vram_addr += 1;
                     }
-                    chr.registers_mut().ppu_data = self.read_vram(self.vram_addr, chr);
                 },
                 _ => {}
             }
