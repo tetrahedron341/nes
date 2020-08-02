@@ -28,29 +28,28 @@ const PIXEL_SCALE: u32 = 2;
 const GAME_WIDTH: u32 = 256*PIXEL_SCALE;
 const GAME_HEIGHT: u32 = 240*PIXEL_SCALE;
 
-pub fn run(rom_name: String) {
-    let sdl_ctx = sdl2::init().unwrap();
-    let video = sdl_ctx.video().unwrap();
-    let audio_ctx = sdl_ctx.audio().unwrap();
+pub fn run(rom_name: String) -> Result<(), Box<dyn std::error::Error>> {
+    let sdl_ctx = sdl2::init()?;
+    let video = sdl_ctx.video()?;
+    let audio_ctx = sdl_ctx.audio()?;
     let mut window = video.window(TITLE, GAME_WIDTH, GAME_HEIGHT)
         .opengl()
         .position_centered()
-        .build()
-        .unwrap();
+        .build()?;
         
-    window.set_title(&format!("{}: {}x{}", TITLE, GAME_WIDTH, GAME_HEIGHT)).unwrap();
+    window.set_title(&format!("{}: {}x{}", TITLE, GAME_WIDTH, GAME_HEIGHT))?;
     window.set_display_mode(sdl2::video::DisplayMode::new(
         sdl2::pixels::PixelFormatEnum::RGB24,
-        window.display_mode().unwrap().w,
-        window.display_mode().unwrap().h,
+        window.display_mode()?.w,
+        window.display_mode()?.h,
         60
-    )).unwrap();
+    ))?;
 
     let main_window_id = window.id();
     
-    let mut canvas = window.into_canvas().build().unwrap();
+    let mut canvas = window.into_canvas().build()?;
     let tc = canvas.texture_creator();
-    let screen = Screen::new(&tc, GAME_WIDTH/PIXEL_SCALE, GAME_HEIGHT/PIXEL_SCALE).unwrap();
+    let screen = Screen::new(&tc, GAME_WIDTH/PIXEL_SCALE, GAME_HEIGHT/PIXEL_SCALE)?;
     
     let controller = Controller::new();
 
@@ -59,16 +58,16 @@ pub fn run(rom_name: String) {
                 channels: Some(1),
                 freq: None,
                 samples: None
-            }).unwrap()
+            })?
     };
     audio.device.resume();
 
-    let cart = nes_core::cart::Cart::from_file(rom_name).unwrap();
+    let cart = nes_core::cart::Cart::from_file(rom_name)?;
     let mut nes: Nes = nes_core::nes::Nes::new(cart, screen, controller, audio, None);
 
     let mut save_state: Option<NesSaveState> = None;
 
-    let mut event_pump = sdl_ctx.event_pump().unwrap();
+    let mut event_pump = sdl_ctx.event_pump()?;
 
     let mut paused = false;
     let mut muted = false;
@@ -90,7 +89,7 @@ pub fn run(rom_name: String) {
             .set_title(
                 &format!("{}: {}x{} FPS: {:.2} {} {}", 
                     TITLE, GAME_WIDTH, GAME_HEIGHT, fps, if paused {"Paused"} else {""}, if muted {"Muted"} else {&vol_pct})
-                ).unwrap();
+                )
     };
 
     'running: loop {
@@ -134,7 +133,7 @@ pub fn run(rom_name: String) {
                 },
                 Event::KeyDown {keycode: Some(Keycode::P), keymod: sdl2::keyboard::Mod::LCTRLMOD, ..} |
                 Event::KeyDown {keycode: Some(Keycode::P), keymod: sdl2::keyboard::Mod::RCTRLMOD, ..} => {
-                    debug_screen.replace(PatternTableViewer::new(&video).unwrap());
+                    debug_screen.replace(PatternTableViewer::new(&video)?);
                 },
                 Event::KeyDown {keycode: Some(Keycode::S), keymod: sdl2::keyboard::Mod::LCTRLMOD, ..} |
                 Event::KeyDown {keycode: Some(Keycode::S), keymod: sdl2::keyboard::Mod::RCTRLMOD, ..} => {
@@ -164,7 +163,7 @@ pub fn run(rom_name: String) {
                     if paused {
                         nes.get_audio_device_mut().device.clear();
                     }
-                    update_title(&mut canvas, fps, paused, muted, nes.apu.volume);
+                    update_title(&mut canvas, fps, paused, muted, nes.apu.volume)?;
                 },
 
                 Event::KeyDown {keycode: Some(Keycode::M), ..} => {
@@ -176,7 +175,7 @@ pub fn run(rom_name: String) {
                         nes.get_audio_device_mut().device.clear();
                         nes.get_audio_device_mut().device.resume();
                     }
-                    update_title(&mut canvas, fps, paused, muted, nes.apu.volume);
+                    update_title(&mut canvas, fps, paused, muted, nes.apu.volume)?;
                 },
 
                 Event::KeyDown {keycode: Some(Keycode::Plus), ..} |
@@ -186,14 +185,14 @@ pub fn run(rom_name: String) {
                     nes.apu.volume += 0.1;
                     nes.apu.volume = nes.apu.volume.min(5.0);
                     println!("Volume set to: {}", nes.apu.volume);
-                    update_title(&mut canvas, fps, paused, muted, nes.apu.volume);
+                    update_title(&mut canvas, fps, paused, muted, nes.apu.volume)?;
                 },
                 Event::KeyDown {keycode: Some(Keycode::Minus), ..} |
                 Event::KeyDown {keycode: Some(Keycode::KpMinus), ..} => {
                     nes.apu.volume -= 0.1;
                     nes.apu.volume = nes.apu.volume.max(0.0);
                     println!("Volume set to: {}", nes.apu.volume);
-                    update_title(&mut canvas, fps, paused, muted, nes.apu.volume);
+                    update_title(&mut canvas, fps, paused, muted, nes.apu.volume)?;
                 },
 
                 Event::KeyDown {keycode: Some(Keycode::RightBracket), ..} => {
@@ -212,7 +211,7 @@ pub fn run(rom_name: String) {
                 },
                 Event::KeyDown {keycode: Some(Keycode::O), ..} => {
                     println!("{}", nes.ppu.print_oam());
-                    // println!("{}", std::str::from_utf8(nes.mmu.blargg_debug_text()).unwrap())
+                    // println!("{}", std::str::from_utf8(nes.mmu.blargg_debug_text())?)
                 },
                 Event::KeyDown {keycode: Some(Keycode::R), ..} => {
                     println!("{:X?}", nes.mmu.ppu_registers);
@@ -295,7 +294,7 @@ pub fn run(rom_name: String) {
                 &txt, 
                 Rect::new(0,0,GAME_WIDTH/PIXEL_SCALE, GAME_HEIGHT/PIXEL_SCALE), 
                 Rect::new(0,0, GAME_WIDTH, GAME_HEIGHT)
-            ).unwrap();
+            )?;
         }
         
         if !paused || update_debug {
@@ -311,14 +310,16 @@ pub fn run(rom_name: String) {
         canvas.present();
         fps_count += 1;
         if fps_count >= 65 {
-            let t = fps_timer.elapsed().unwrap();
+            let t = fps_timer.elapsed()?;
             fps = (1.0 / t.as_secs_f64()) * 65.0;
             fps_timer = std::time::SystemTime::now();
             fps_count = 0;
-            update_title(&mut canvas, fps, paused, muted, nes.apu.volume);
+            update_title(&mut canvas, fps, paused, muted, nes.apu.volume)?;
         }
         if !frame_unlocked {
-            std::thread::sleep(std::time::Duration::from_micros(1_000_000 / 65).checked_sub(frame_start_time.elapsed().unwrap()).unwrap_or_default())
+            std::thread::sleep(std::time::Duration::from_micros(1_000_000 / 65).checked_sub(frame_start_time.elapsed()?).unwrap_or_default())
         }
     }
+
+    Ok(())
 }

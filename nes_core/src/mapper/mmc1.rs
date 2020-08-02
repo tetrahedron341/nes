@@ -220,7 +220,7 @@ impl Mapper for MMC1 {
         }
     }
     fn reset(&mut self) {
-        std::mem::replace(self, MMC1 {
+        *self = MMC1 {
             incoming_value: 0,
             bits_shifted: 0,
 
@@ -237,7 +237,7 @@ impl Mapper for MMC1 {
 
             chr_ram: [0; CHR_RAM_SIZE],
             prg_ram: self.prg_ram
-        });
+        };
     }
     fn clone(&self) -> Box<dyn Mapper + Send + Sync> {
         Box::new(Clone::clone(self))

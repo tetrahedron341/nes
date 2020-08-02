@@ -2,7 +2,7 @@
 pub enum Error {
     #[display(fmt="IO Error: {}", "_0")]
     IOErr(std::io::Error),
-    #[display(fmt="Format Error: {}", "_0")]
+    #[display(fmt="File Error: {}", "_0")]
     FormatErr(String),
     #[display(fmt="Invalid Opcode at {:#06X}: {:#04X}", "_0", "_1")]
     InvalidOpcodeErr(u16, u8),
@@ -29,6 +29,8 @@ impl Error {
         Error::OtherErr(e)
     }
 }
+
+impl std::error::Error for Error {}
 
 pub type Result<T> = std::result::Result<T, Error>;
 
