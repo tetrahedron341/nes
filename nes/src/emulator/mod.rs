@@ -92,6 +92,8 @@ pub fn run(rom_name: String) -> Result<(), Box<dyn std::error::Error>> {
                 )
     };
 
+    let mut ctrl_down = false;
+
     'running: loop {
         let frame_start_time = std::time::SystemTime::now();
         for event in event_pump.poll_iter() {
@@ -123,24 +125,30 @@ pub fn run(rom_name: String) -> Result<(), Box<dyn std::error::Error>> {
                         _ => ()
                     }
                 },
-                Event::KeyDown {keycode: Some(Keycode::R), keymod: sdl2::keyboard::Mod::LCTRLMOD, ..} |
-                Event::KeyDown {keycode: Some(Keycode::R), keymod: sdl2::keyboard::Mod::RCTRLMOD, ..} => {
+
+                Event::KeyDown {keycode: Some(Keycode::LCtrl), ..} |
+                Event::KeyDown {keycode: Some(Keycode::RCtrl), ..} => {ctrl_down = true;},
+                Event::KeyUp {keycode: Some(Keycode::LCtrl), ..} |
+                Event::KeyUp {keycode: Some(Keycode::RCtrl), ..} => {ctrl_down = false;},
+
+                
+                Event::KeyDown {keycode: Some(Keycode::R), ..} if ctrl_down => {
                     nes.reset();
                 },
-                Event::KeyDown {keycode: Some(Keycode::T), keymod: sdl2::keyboard::Mod::LCTRLMOD, ..} |
-                Event::KeyDown {keycode: Some(Keycode::T), keymod: sdl2::keyboard::Mod::RCTRLMOD, ..} => {
+                
+                Event::KeyDown {keycode: Some(Keycode::T), ..} if ctrl_down => {
                     nametable_viewer.replace(NametableViewer::new(&video));
                 },
-                Event::KeyDown {keycode: Some(Keycode::P), keymod: sdl2::keyboard::Mod::LCTRLMOD, ..} |
-                Event::KeyDown {keycode: Some(Keycode::P), keymod: sdl2::keyboard::Mod::RCTRLMOD, ..} => {
+                
+                Event::KeyDown {keycode: Some(Keycode::P), ..} if ctrl_down => {
                     debug_screen.replace(PatternTableViewer::new(&video)?);
                 },
-                Event::KeyDown {keycode: Some(Keycode::S), keymod: sdl2::keyboard::Mod::LCTRLMOD, ..} |
-                Event::KeyDown {keycode: Some(Keycode::S), keymod: sdl2::keyboard::Mod::RCTRLMOD, ..} => {
+                
+                Event::KeyDown {keycode: Some(Keycode::S), ..} if ctrl_down => {
                     save_state = Some(nes.save_state());
                 },
-                Event::KeyDown {keycode: Some(Keycode::L), keymod: sdl2::keyboard::Mod::LCTRLMOD, ..} |
-                Event::KeyDown {keycode: Some(Keycode::L), keymod: sdl2::keyboard::Mod::RCTRLMOD, ..} => {
+                
+                Event::KeyDown {keycode: Some(Keycode::L), ..} if ctrl_down => {
                     save_state.as_ref().map(|s| nes.load_state(s.clone()));
                 },
 
