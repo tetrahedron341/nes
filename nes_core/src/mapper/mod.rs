@@ -2,6 +2,7 @@ mod nrom;
 pub mod dummy;
 mod mmc1;
 mod uxrom;
+mod axrom;
 
 use crate::error::*;
 use crate::cart::{Ines, Mirroring};
@@ -32,6 +33,8 @@ pub fn from_ines_id(id: u16) -> Result<Box<dyn Mapper + Send + Sync>> {
         0 => Ok(Box::new(nrom::NROM::new())),
         1 => Ok(Box::new(mmc1::MMC1::new())),
         2 => Ok(Box::new(uxrom::UxROM::new())),
+
+        7 => Ok(Box::new(axrom::AxROM::new())),
         _ => Err(Error::format_err(format!("Invalid mapper ID: {}", id)))
     }
 }
