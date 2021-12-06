@@ -1,11 +1,11 @@
-mod nrom;
+mod axrom;
 pub mod dummy;
 mod mmc1;
+mod nrom;
 mod uxrom;
-mod axrom;
 
-use crate::error::*;
 use crate::cart::{Ines, Mirroring};
+use crate::error::*;
 
 /// Represents a memory banking method for a cartridge.
 pub trait Mapper {
@@ -20,8 +20,8 @@ pub trait Mapper {
     /// Clones the mapper's state
     fn clone(&self) -> Box<dyn Mapper + Send + Sync>;
     /// Gets the nametable mirroring mode.
-    /// 
-    /// The default implementation always selects the mirroring mode defined 
+    ///
+    /// The default implementation always selects the mirroring mode defined
     /// in the iNES header.
     fn mirroring(&self) -> Option<Mirroring> {
         None
@@ -35,6 +35,6 @@ pub fn from_ines_id(id: u16) -> Result<Box<dyn Mapper + Send + Sync>> {
         2 => Ok(Box::new(uxrom::UxROM::new())),
 
         7 => Ok(Box::new(axrom::AxROM::new())),
-        _ => Err(Error::format_err(format!("Invalid mapper ID: {}", id)))
+        _ => Err(Error::format_err(format!("Invalid mapper ID: {}", id))),
     }
 }

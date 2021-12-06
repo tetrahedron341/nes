@@ -27,7 +27,7 @@ impl Sweep {
             match self.negate_mode {
                 1 => change_amount = -change_amount,
                 0 => change_amount = -change_amount - 1,
-                _ => unreachable!()
+                _ => unreachable!(),
             }
         }
         (raw_timer_period as i16 + change_amount) as u16

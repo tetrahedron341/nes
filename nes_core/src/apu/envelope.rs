@@ -9,7 +9,7 @@ pub struct Envelope {
 
 impl Envelope {
     pub fn new() -> Self {
-        Envelope{
+        Envelope {
             loop_env: false,
             disable: false,
             raw_period: 1,

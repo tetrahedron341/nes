@@ -1,15 +1,15 @@
 #![allow(dead_code)]
 
+use nes_core::{
+    apu::AudioOutput,
+    cart::Cart,
+    controller::{ControllerState, NESController},
+    ppu::{Color, VideoInterface},
+};
+use std::convert::TryFrom;
+use std::sync::RwLock;
 use wasm_bindgen::prelude::*;
 use wasm_bindgen::JsCast;
-use std::sync::RwLock;
-use std::convert::TryFrom;
-use nes_core::{
-    ppu::{VideoInterface, Color}, 
-    apu::AudioOutput,
-    controller::{NESController, ControllerState},
-    cart::Cart
-};
 
 #[wasm_bindgen]
 extern "C" {
@@ -23,20 +23,20 @@ pub fn initialize() {
 }
 
 #[wasm_bindgen]
-pub struct Nes (nes_core::nes::Nes<CanvasOutput, Controller, Audio>);
+pub struct Nes(nes_core::nes::Nes<CanvasOutput, Controller, Audio>);
 
 #[wasm_bindgen]
 #[derive(Clone)]
-pub struct NesSaveState (nes_core::nes::NesSaveState);
+pub struct NesSaveState(nes_core::nes::NesSaveState);
 
 struct Controller {
-    buttons: ControllerState
+    buttons: ControllerState,
 }
 
 impl Controller {
     fn new() -> Self {
         Controller {
-            buttons: ControllerState::empty()
+            buttons: ControllerState::empty(),
         }
     }
     fn buttons_down(&mut self, buttons: ControllerState) {
@@ -55,15 +55,20 @@ impl NESController for Controller {
 
 #[derive(Debug, Copy, Clone)]
 enum Button {
-    A, B,
-    Up, Down, Left, Right,
-    Start, Select
+    A,
+    B,
+    Up,
+    Down,
+    Left,
+    Right,
+    Start,
+    Select,
 }
 
-impl Into<JsValue> for Button {
-    fn into(self) -> JsValue {
+impl From<Button> for JsValue {
+    fn from(val: Button) -> Self {
         use Button::*;
-        match self {
+        match val {
             A => "A".into(),
             B => "B".into(),
             Start => "Start".into(),
@@ -71,15 +76,15 @@ impl Into<JsValue> for Button {
             Left => "Left".into(),
             Right => "Right".into(),
             Up => "Up".into(),
-            Down => "Down".into()
+            Down => "Down".into(),
         }
     }
 }
 
-impl Into<ControllerState> for Button {
-    fn into(self) -> ControllerState {
+impl From<Button> for ControllerState {
+    fn from(val: Button) -> Self {
         use Button::*;
-        match self {
+        match val {
             A => ControllerState::A,
             B => ControllerState::B,
             Start => ControllerState::START,
@@ -106,70 +111,65 @@ impl TryFrom<JsValue> for Button {
             "right" => Ok(Right),
             "up" => Ok(Up),
             "down" => Ok(Down),
-            _ => Err("Invalid input".into())
+            _ => Err("Invalid input".into()),
         }
     }
 }
 
 struct CanvasOutput {
-    frame: RwLock<Vec<u8>>
+    frame: RwLock<Vec<u8>>,
 }
 
 impl VideoInterface for CanvasOutput {
     fn draw_pixel(&self, x: u16, y: u16, color: Color) {
         if y >= 240 {
-            return
+            return;
         }
         if x >= 256 {
-            return
+            return;
         }
-        let offset1 = (2*y as usize*512 + 2*x as usize) * 4;
-        let offset2 = ((2*y as usize + 1)*512 + 2*x as usize) * 4;
+        let offset1 = (2 * y as usize * 512 + 2 * x as usize) * 4;
+        let offset2 = offset1 + 4;
+        let offset3 = ((2 * y as usize + 1) * 512 + 2 * x as usize) * 4;
+        let offset4 = offset3 + 4;
+
         let mut frame = self.frame.write().unwrap();
-        frame[offset1 + 0] = color.0;
-        frame[offset1 + 1] = color.1;
-        frame[offset1 + 2] = color.2;
-        frame[offset1 + 3] = 255;
-        frame[offset1 + 4] = color.0;
-        frame[offset1 + 5] = color.1;
-        frame[offset1 + 6] = color.2;
-        frame[offset1 + 7] = 255;
-        frame[offset2 + 0] = color.0;
-        frame[offset2 + 1] = color.1;
-        frame[offset2 + 2] = color.2;
-        frame[offset2 + 3] = 255;
-        frame[offset2 + 4] = color.0;
-        frame[offset2 + 5] = color.1;
-        frame[offset2 + 6] = color.2;
-        frame[offset2 + 7] = 255;
+        for pix_off in [offset1, offset2, offset3, offset4] {
+            frame[pix_off] = color.0;
+            frame[pix_off + 1] = color.1;
+            frame[pix_off + 2] = color.2;
+            frame[pix_off + 3] = 255;
+        }
     }
     fn end_of_frame(&self) {
         let ctx = get_canvas_context();
         let frame = self.frame.read().unwrap();
         let mut frame_copy = {
-            let mut _fc = [0 ; 512 * 480 * 4];
+            let mut _fc = [0; 512 * 480 * 4];
             assert!(frame.len() == 512 * 480 * 4);
             _fc.copy_from_slice(&frame[..512 * 480 * 4]);
             _fc
         };
         let clamped = wasm_bindgen::Clamped(&mut frame_copy[..]);
         let image_data = web_sys::ImageData::new_with_u8_clamped_array(clamped, 512).unwrap();
-        ctx.put_image_data(&image_data, 0.,0.).unwrap();
+        ctx.put_image_data(&image_data, 0., 0.).unwrap();
     }
 }
 
 #[wasm_bindgen]
-pub struct Audio {
-    
-}
+pub struct Audio {}
 
 #[wasm_bindgen]
 impl Audio {
     #[wasm_bindgen(constructor)]
     pub fn new() -> Self {
-        Audio {
+        Audio {}
+    }
+}
 
-        }
+impl Default for Audio {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -186,14 +186,18 @@ impl AudioOutput for Audio {
 
 #[wasm_bindgen]
 pub fn init_emulator(audio: Audio) -> Result<Nes, JsValue> {
-    let canvas = CanvasOutput { frame: RwLock::new(vec!(0 ; 512 * 480 * 4)) };
-    let controller = Controller { buttons: ControllerState::empty() };
+    let canvas = CanvasOutput {
+        frame: RwLock::new(vec![0; 512 * 480 * 4]),
+    };
+    let controller = Controller {
+        buttons: ControllerState::empty(),
+    };
     let nes = nes_core::nes_builder()
         .video(canvas)
         .controller(controller)
         .audio(audio)
-        .build(None,None);
-    
+        .build(None, None);
+
     Ok(Nes(nes))
 }
 

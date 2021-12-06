@@ -7,6 +7,10 @@ pub trait AudioOutput {
 pub struct DummyAudio();
 
 impl AudioOutput for DummyAudio {
-    fn queue_audio(&mut self, _samples: &mut [f32]) -> Result<(), String> {Ok(())}
-    fn sample_rate(&self) -> usize {1}
+    fn queue_audio(&mut self, _samples: &mut [f32]) -> Result<(), String> {
+        Ok(())
+    }
+    fn sample_rate(&self) -> usize {
+        1
+    }
 }

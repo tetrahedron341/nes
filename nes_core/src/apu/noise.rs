@@ -1,5 +1,5 @@
-use super::length_counter::LengthCounter;
 use super::envelope::Envelope;
+use super::length_counter::LengthCounter;
 
 pub struct Noise {
     pub enabled: bool,
@@ -26,7 +26,7 @@ impl Noise {
             mode: false,
 
             raw_timer_period: 0,
-            timer_div: 0
+            timer_div: 0,
         }
     }
 
@@ -37,21 +37,21 @@ impl Noise {
                 self.len_ctr.halt = v & 0x20 != 0;
                 self.envelope.disable = v & 0x10 != 0;
                 self.envelope.raw_period = v & 0x0f;
-            },
+            }
             1 => {
                 // https://wiki.nesdev.com/w/index.php/APU_Noise
                 const PERIOD_LOOKUP: [u16; 16] = [
-                    4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068
+                    4, 8, 16, 32, 64, 96, 128, 160, 202, 254, 380, 508, 762, 1016, 2034, 4068,
                 ];
 
                 self.mode = v & 0x80 != 0;
                 self.raw_timer_period = PERIOD_LOOKUP[v as usize & 0x0f];
-            },
+            }
             2 => {
                 self.len_ctr.load_counter((v & 0xf8) >> 3);
                 self.restart_envelope = true;
-            },
-            _ => panic!("Invalid noise register index {}", i)
+            }
+            _ => panic!("Invalid noise register index {}", i),
         }
     }
 

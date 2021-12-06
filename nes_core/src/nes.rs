@@ -1,10 +1,10 @@
-use crate::mos6502::MOS6502;
-use crate::ppu::{PPU, VideoInterface, Color, PPUSaveState};
-use crate::mmu::{MMU, MMUSaveState};
+use crate::apu::{AudioOutput, APU};
 use crate::cart::Cart;
-use crate::error::*;
 use crate::controller::NESController;
-use crate::apu::{APU, AudioOutput};
+use crate::error::*;
+use crate::mmu::{MMUSaveState, MMU};
+use crate::mos6502::MOS6502;
+use crate::ppu::{Color, PPUSaveState, VideoInterface, PPU};
 use bitflags::bitflags;
 
 bitflags! {
@@ -14,34 +14,40 @@ bitflags! {
     }
 }
 
-impl Into<crate::mos6502::CPUConfig> for &NESConfig {
-    fn into(self) -> crate::mos6502::CPUConfig {
+impl From<&NESConfig> for crate::mos6502::CPUConfig {
+    fn from(val: &NESConfig) -> Self {
         use crate::mos6502::CPUConfig;
         let mut out = CPUConfig::empty();
-        out.set(CPUConfig::DEBUG, self.contains(NESConfig::DEBUG));
-        out.set(CPUConfig::DEBUG_OUTPUT, self.contains(NESConfig::DEBUG_OUTPUT));
+        out.set(CPUConfig::DEBUG, val.contains(NESConfig::DEBUG));
+        out.set(
+            CPUConfig::DEBUG_OUTPUT,
+            val.contains(NESConfig::DEBUG_OUTPUT),
+        );
         out
     }
 }
-impl Into<crate::mmu::MMUConfig> for &NESConfig {
-    fn into(self) -> crate::mmu::MMUConfig {
+impl From<&NESConfig> for crate::mmu::MMUConfig {
+    fn from(val: &NESConfig) -> Self {
         use crate::mmu::MMUConfig;
         let mut out = MMUConfig::empty();
-        out.set(MMUConfig::DEBUG, self.contains(NESConfig::DEBUG));
-        out.set(MMUConfig::DEBUG_OUTPUT, self.contains(NESConfig::DEBUG_OUTPUT));
+        out.set(MMUConfig::DEBUG, val.contains(NESConfig::DEBUG));
+        out.set(
+            MMUConfig::DEBUG_OUTPUT,
+            val.contains(NESConfig::DEBUG_OUTPUT),
+        );
         out
     }
 }
 
-struct NesVideoWrapper<V> { 
+struct NesVideoWrapper<V> {
     screen: V,
-    frame_completed: std::cell::Cell<bool>
+    frame_completed: std::cell::Cell<bool>,
 }
 
 impl<V: VideoInterface> VideoInterface for NesVideoWrapper<V> {
     #[inline]
     fn draw_pixel(&self, x: u16, y: u16, color: Color) {
-        self.screen.draw_pixel(x,y, color);
+        self.screen.draw_pixel(x, y, color);
     }
     #[inline]
     fn end_of_frame(&self) {
@@ -54,7 +60,7 @@ impl<V: VideoInterface> VideoInterface for NesVideoWrapper<V> {
 pub struct NesSaveState {
     cpu_state: MOS6502,
     mmu_state: MMUSaveState,
-    ppu_state: PPUSaveState
+    ppu_state: PPUSaveState,
 }
 
 /// Represents the NES system.
@@ -66,14 +72,20 @@ pub struct Nes<V: VideoInterface, C: NESController, A: AudioOutput> {
     screen: NesVideoWrapper<V>,
     cycles_counter: u32,
     oam_write: Option<u8>,
-    _config: NESConfig
+    _config: NESConfig,
 }
 
-impl<'a, V: VideoInterface, C: NESController, A: AudioOutput> Nes<V,C,A> {
-    pub fn new<T: Into<Option<Cart>>>(cart: T, screen: V, controller: C, audio: A, config: Option<NESConfig>) -> Self {
+impl<'a, V: VideoInterface, C: NESController, A: AudioOutput> Nes<V, C, A> {
+    pub fn new<T: Into<Option<Cart>>>(
+        cart: T,
+        screen: V,
+        controller: C,
+        audio: A,
+        config: Option<NESConfig>,
+    ) -> Self {
         let mut cpu = MOS6502::new(config.as_ref().map(|c| c.into()));
         cpu.reset();
-        let ppu = PPU::new();
+        let ppu = PPU::default();
         let apu = APU::new(audio);
         let mmu = MMU::new(cart, controller, config.as_ref().map(|c| c.into()));
 
@@ -82,10 +94,13 @@ impl<'a, V: VideoInterface, C: NESController, A: AudioOutput> Nes<V,C,A> {
             ppu,
             apu,
             mmu,
-            screen: NesVideoWrapper{screen, frame_completed: std::cell::Cell::new(false)},
+            screen: NesVideoWrapper {
+                screen,
+                frame_completed: std::cell::Cell::new(false),
+            },
             cycles_counter: 0,
             oam_write: None,
-            _config: config.unwrap_or(NESConfig::empty())
+            _config: config.unwrap_or_else(NESConfig::empty),
         }
     }
 
@@ -99,7 +114,7 @@ impl<'a, V: VideoInterface, C: NESController, A: AudioOutput> Nes<V,C,A> {
         NesSaveState {
             cpu_state: self.cpu.clone(),
             mmu_state: self.mmu.save_state(),
-            ppu_state: self.ppu.save_state()
+            ppu_state: self.ppu.save_state(),
         }
     }
 
@@ -111,7 +126,7 @@ impl<'a, V: VideoInterface, C: NESController, A: AudioOutput> Nes<V,C,A> {
 
     pub fn master_clock_tick(&mut self) -> Result<()> {
         if !self.mmu.has_cartridge() {
-            return Err(Error::missing_cart())
+            return Err(Error::missing_cart());
         }
 
         if self.mmu.oam_transfer {
@@ -146,7 +161,7 @@ impl<'a, V: VideoInterface, C: NESController, A: AudioOutput> Nes<V,C,A> {
         self.apu.tick(&mut self.mmu.apu_registers);
         self.apu.tick(&mut self.mmu.apu_registers);
         self.apu.tick(&mut self.mmu.apu_registers);
-        
+
         Ok(())
     }
 
@@ -156,7 +171,7 @@ impl<'a, V: VideoInterface, C: NESController, A: AudioOutput> Nes<V,C,A> {
             self.master_clock_tick()?;
             if self.screen.frame_completed.get() {
                 self.screen.frame_completed.set(false);
-                break
+                break;
             }
         }
 
@@ -176,10 +191,10 @@ impl<'a, V: VideoInterface, C: NESController, A: AudioOutput> Nes<V,C,A> {
         r
     }
 
-    pub fn get_palette(&self, id: u16) -> [(u8,u8,u8); 4] {
-        let index = (4*id) as usize;
-        let palette = &self.ppu.palette_ram[index..index+4];
-        let mut out = [(0,0,0); 4];
+    pub fn get_palette(&self, id: u16) -> [(u8, u8, u8); 4] {
+        let index = (4 * id) as usize;
+        let palette = &self.ppu.palette_ram[index..index + 4];
+        let mut out = [(0, 0, 0); 4];
         for i in 0..4 {
             let c = palette[i as usize];
             out[i as usize] = self.ppu.convert_color_to_rgb(c).into_tuple();
@@ -187,8 +202,8 @@ impl<'a, V: VideoInterface, C: NESController, A: AudioOutput> Nes<V,C,A> {
         out
     }
 
-    pub fn palette_table(&self) -> [(u8,u8,u8); 32] {
-        let mut out = [(0,0,0); 32];
+    pub fn palette_table(&self) -> [(u8, u8, u8); 32] {
+        let mut out = [(0, 0, 0); 32];
         let palette_table = &self.ppu.palette_ram[..];
         for i in 0..32 {
             let c = palette_table[i];
@@ -199,14 +214,13 @@ impl<'a, V: VideoInterface, C: NESController, A: AudioOutput> Nes<V,C,A> {
 
     /// Returns a clone of 0x2000-0x2fff of PPU memory
     pub fn get_nametables(&self) -> [u8; 0x1000] {
+        use crate::ppu::PPUMemory;
         let mut buf = [0; 0x1000];
-        for i in 0..0x1000 {
-            use crate::ppu::PPUMemory;
-            buf[i] = self.mmu.read_ppu(0x2000 + i as u16);
-        }
+        buf.iter_mut().enumerate().for_each(|(i, b)| {
+            *b = self.mmu.read_ppu(0x2000 + i as u16);
+        });
         buf
     }
-
 
     #[inline]
     pub fn get_screen(&self) -> &V {
@@ -216,7 +230,7 @@ impl<'a, V: VideoInterface, C: NESController, A: AudioOutput> Nes<V,C,A> {
     pub fn get_screen_mut(&mut self) -> &mut V {
         &mut self.screen.screen
     }
-    
+
     #[inline]
     pub fn get_audio_device(&self) -> &A {
         self.apu.audio_device()

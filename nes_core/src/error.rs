@@ -1,15 +1,15 @@
 #[derive(Debug, Display)]
 pub enum Error {
-    #[display(fmt="IO Error: {}", "_0")]
+    #[display(fmt = "IO Error: {}", "_0")]
     IOErr(std::io::Error),
-    #[display(fmt="File Error: {}", "_0")]
+    #[display(fmt = "File Error: {}", "_0")]
     FormatErr(String),
-    #[display(fmt="Invalid Opcode at {:#06X}: {:#04X}", "_0", "_1")]
+    #[display(fmt = "Invalid Opcode at {:#06X}: {:#04X}", "_0", "_1")]
     InvalidOpcodeErr(u16, u8),
-    #[display(fmt="Missing cartridge!")]
+    #[display(fmt = "Missing cartridge!")]
     MissingCartErr,
-    #[display(fmt="Error: {}", "_0")]
-    OtherErr(String)
+    #[display(fmt = "Error: {}", "_0")]
+    OtherErr(String),
 }
 
 impl Error {

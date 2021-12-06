@@ -1,9 +1,9 @@
 use lazy_static::lazy_static;
-use std::{fmt::Display, collections::HashMap};
+use std::{collections::HashMap, fmt::Display};
 
 /// Represents the information needed to decode an instruction using the opcode.
-/// 
-/// Contains: 
+///
+/// Contains:
 /// * Assembler Mnemonic (LDA, ADC, etc.)
 /// * Addressing mode
 /// * Changes to status flags
@@ -16,8 +16,8 @@ pub struct Instruction {
     pub cycles: u32,
     pub can_change_cycles: bool,
     pub no_read: bool,
-    
-    pub flag_changes: FlagChanges
+
+    pub flag_changes: FlagChanges,
 }
 
 /// Instruction addressing mode
@@ -48,9 +48,10 @@ pub enum AddrMode {
     /// `OPC $LL,X`
     ZeroPageX,
     /// `OPC $LL,Y`
-    ZeroPageY
+    ZeroPageY,
 }
 
+#[allow(clippy::upper_case_acronyms)]
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
 pub enum Mnemonic {
     LDA,
@@ -175,20 +176,27 @@ impl Display for Mnemonic {
 }
 
 /// Changes to status flags
-/// 
+///
 /// Contents are in the order:
-/// 
+///
 /// N Z C I D V
 #[allow(non_snake_case)]
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct FlagChanges (pub FlagChange, pub FlagChange, pub FlagChange, pub FlagChange, pub FlagChange, pub FlagChange);
+pub struct FlagChanges(
+    pub FlagChange,
+    pub FlagChange,
+    pub FlagChange,
+    pub FlagChange,
+    pub FlagChange,
+    pub FlagChange,
+);
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum FlagChange {
     NotModified,
     Modified,
     Set,
-    Unset
+    Unset,
 }
 
 macro_rules! instruction {
@@ -306,12 +314,19 @@ macro_rules! flag_changes {
 }
 
 macro_rules! flag_change {
-    (-) => {NotModified};
-    (+) => {Modified};
-    (1) => {Set};
-    (0) => {Unset};
+    (-) => {
+        NotModified
+    };
+    (+) => {
+        Modified
+    };
+    (1) => {
+        Set
+    };
+    (0) => {
+        Unset
+    };
 }
-
 
 macro_rules! instruction_set {
     ($($mnem:ident $read_mode:tt, ($($flag:tt)+) : { $($ins:tt),+ }),+) => {{
@@ -343,16 +358,16 @@ macro_rules! instruction_set {
 
 macro_rules! add_instruction {
     ($mnem:ident, $flags:ident, {$op:literal, $addr_mode:ident, $cycles:literal}) => {
-        ($op, instruction!($mnem, $addr_mode, $cycles, $flags));
+        ($op, instruction!($mnem, $addr_mode, $cycles, $flags))
     };
     ($mnem:ident, $flags:ident, {$op:literal, $addr_mode:ident, $cycles:literal *}) => {
-        ($op, instruction!($mnem, $addr_mode, $cycles *, $flags));
+        ($op, instruction!($mnem, $addr_mode, $cycles *, $flags))
     };
     ($mnem:ident * , $flags:ident, {$op:literal, $addr_mode:ident, $cycles:literal}) => {
-        ($op, instruction!($mnem *, $addr_mode, $cycles, $flags));
+        ($op, instruction!($mnem *, $addr_mode, $cycles, $flags))
     };
     ($mnem:ident * , $flags:ident, {$op:literal, $addr_mode:ident, $cycles:literal *}) => {
-        ($op, instruction!($mnem *, $addr_mode, $cycles *, $flags));
+        ($op, instruction!($mnem *, $addr_mode, $cycles *, $flags))
     }
 }
 

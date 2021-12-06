@@ -1,6 +1,6 @@
 use bitflags::bitflags;
 
-bitflags!{
+bitflags! {
     pub struct ControllerState: u8 {
         const A = 1 << 0;
         const B = 1 << 1;

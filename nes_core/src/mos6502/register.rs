@@ -78,7 +78,7 @@ impl std::ops::Sub<u16> for Register<u16> {
     }
 }
 
-bitflags!{
+bitflags! {
     pub struct StatusRegister: u8 {
         const C = 1 << 0;
         const Z = 1 << 1;

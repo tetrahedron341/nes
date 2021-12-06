@@ -10,11 +10,11 @@ pub struct PPURegisters {
     pub ppu_data: u8,
 
     /// Contains the index of the last access, and if it was a write.
-    pub(super) last_access_from: std::cell::Cell<Option<(u16, bool)>>
+    pub(super) last_access_from: std::cell::Cell<Option<(u16, bool)>>,
 }
 
-impl PPURegisters {
-    pub fn new() -> Self {
+impl Default for PPURegisters {
+    fn default() -> Self {
         PPURegisters {
             ppu_ctrl: 0,
             ppu_mask: 0,
@@ -25,10 +25,12 @@ impl PPURegisters {
             ppu_addr: 0,
             ppu_data: 0,
 
-            last_access_from: std::cell::Cell::new(None)
+            last_access_from: std::cell::Cell::new(None),
         }
     }
+}
 
+impl PPURegisters {
     /// `0 -> PPUCTRL`
     /// `1 -> PPUMASK`
     /// `2 -> PPUSTATUS`
@@ -49,7 +51,10 @@ impl PPURegisters {
             5 => self.ppu_scroll,
             6 => self.ppu_addr,
             7 => self.ppu_data,
-            _ => {debug_assert!(false, "Illegal PPU register access!"); 255}
+            _ => {
+                debug_assert!(false, "Illegal PPU register access!");
+                255
+            }
         }
     }
     /// Same indexing as `read_by_index`
@@ -64,7 +69,9 @@ impl PPURegisters {
             5 => self.ppu_scroll = v,
             6 => self.ppu_addr = v,
             7 => self.ppu_data = v,
-            _ => {debug_assert!(false, "Illegal PPU register access!")}
+            _ => {
+                debug_assert!(false, "Illegal PPU register access!")
+            }
         }
     }
 }

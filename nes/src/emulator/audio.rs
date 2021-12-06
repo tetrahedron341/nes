@@ -1,5 +1,5 @@
 pub struct Audio {
-    pub device: sdl2::audio::AudioQueue<f32>
+    pub device: sdl2::audio::AudioQueue<f32>,
 }
 
 impl nes_core::apu::AudioOutput for Audio {

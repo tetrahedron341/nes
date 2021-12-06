@@ -6,8 +6,12 @@ pub trait VideoInterface {
 }
 
 impl<V: VideoInterface> VideoInterface for &V {
-    fn draw_pixel(&self, x: u16, y: u16, color: Color) {(**self).draw_pixel(x,y,color)}
-    fn end_of_frame(&self) {(**self).end_of_frame()}
+    fn draw_pixel(&self, x: u16, y: u16, color: Color) {
+        (**self).draw_pixel(x, y, color)
+    }
+    fn end_of_frame(&self) {
+        (**self).end_of_frame()
+    }
 }
 
 pub struct DummyVideo();
@@ -20,7 +24,7 @@ impl VideoInterface for DummyVideo {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Color(pub u8, pub u8, pub u8);
 impl Color {
-    pub fn into_tuple(self) -> (u8,u8,u8) {
+    pub fn into_tuple(self) -> (u8, u8, u8) {
         (self.0, self.1, self.2)
     }
 }

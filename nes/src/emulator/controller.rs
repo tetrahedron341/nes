@@ -2,13 +2,13 @@ use nes_core::controller::ControllerState;
 use std::sync::RwLock;
 
 pub struct Controller {
-    pub buttons: RwLock<ControllerState>
+    pub buttons: RwLock<ControllerState>,
 }
 
 impl Controller {
     pub fn new() -> Self {
         Controller {
-            buttons: RwLock::new(ControllerState::empty())
+            buttons: RwLock::new(ControllerState::empty()),
         }
     }
 }

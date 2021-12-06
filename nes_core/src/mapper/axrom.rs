@@ -23,7 +23,7 @@ impl AxROM {
     fn get_bank<'a>(&self, ines: &'a Ines) -> &'a [u8] {
         let prg_rom = ines.prg_rom_slice();
         let offset = self.bank_select as usize * BANK_SIZE;
-        &prg_rom[offset .. offset+BANK_SIZE]
+        &prg_rom[offset..offset + BANK_SIZE]
     }
 }
 
@@ -40,21 +40,21 @@ impl Mapper for AxROM {
                 } else {
                     self.chr_ram[addr as usize]
                 }
-            },
+            }
 
             0x8000..=0xFFFF => {
                 let bank = self.get_bank(ines);
                 bank[addr as usize - 0x8000]
-            },
+            }
 
-            _ => 255
+            _ => 255,
         }
     }
     fn write(&mut self, ines: &Ines, addr: u16, v: u8) {
         match addr {
             0x0000..=0x1FFF if ines.chr_rom_slice().is_none() => {
                 self.chr_ram[addr as usize] = v;
-            },
+            }
             0x8000..=0xFFFF => {
                 self.bank_select = v & 0x07;
                 self.mirroring = if v & 0x10 != 0 {
@@ -62,7 +62,7 @@ impl Mapper for AxROM {
                 } else {
                     Mirroring::OneScreenLowerBank
                 };
-            },
+            }
             _ => {}
         }
     }

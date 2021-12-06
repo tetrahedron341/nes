@@ -1,12 +1,12 @@
 use super::envelope::Envelope;
-use super::sweep::Sweep;
 use super::length_counter::LengthCounter;
+use super::sweep::Sweep;
 
 const SEQUENCER_STEPS: [[u8; 8]; 4] = [
-    [0,1,0,0,0,0,0,0],
-    [0,1,1,0,0,0,0,0],
-    [0,1,1,1,1,0,0,0],
-    [1,0,0,1,1,1,1,1]
+    [0, 1, 0, 0, 0, 0, 0, 0],
+    [0, 1, 1, 0, 0, 0, 0, 0],
+    [0, 1, 1, 1, 1, 0, 0, 0],
+    [1, 0, 0, 1, 1, 1, 1, 1],
 ];
 
 pub struct Pulse {
@@ -35,7 +35,7 @@ impl Pulse {
                 self.envelope.loop_env = v & 0x20 != 0;
                 self.envelope.disable = v & 0x10 != 0;
                 self.envelope.raw_period = v & 0x0f;
-            },
+            }
             1 => {
                 self.sweep.enable = v & 0x80 != 0;
                 self.sweep.raw_period = (v & 0x70) >> 4;
@@ -43,11 +43,11 @@ impl Pulse {
                 self.sweep.shift = v & 0x07;
 
                 self.register_two_write = true;
-            },
+            }
             2 => {
                 self.raw_timer_period &= 0b111_0000_0000;
                 self.raw_timer_period |= v as u16;
-            },
+            }
             3 => {
                 self.raw_timer_period &= 0b000_1111_1111;
                 self.raw_timer_period |= ((v & 0b111) as u16) << 8;
@@ -56,8 +56,8 @@ impl Pulse {
                 }
 
                 self.register_four_write = true;
-            },
-            _ => unreachable!()
+            }
+            _ => unreachable!(),
         }
     }
 
@@ -70,7 +70,7 @@ impl Pulse {
             sweep: Sweep::new(channel_number),
             length_counter: LengthCounter::new(),
             sequencer: 0,
-            
+
             register_four_write: false,
             register_two_write: false,
 
@@ -78,7 +78,7 @@ impl Pulse {
             timer_div: 0,
         }
     }
-    
+
     pub fn digital_sample(&self) -> u8 {
         let envelope = self.envelope.get_volume();
         let sweep_mute = self.sweep.is_muted(self.raw_timer_period);
@@ -98,7 +98,8 @@ impl Pulse {
     }
 
     pub fn tick_length_and_sweep(&mut self) {
-        self.sweep.tick(self.register_two_write, &mut self.raw_timer_period);
+        self.sweep
+            .tick(self.register_two_write, &mut self.raw_timer_period);
         self.length_counter.tick();
         self.register_two_write = false;
     }
