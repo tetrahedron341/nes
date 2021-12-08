@@ -1,23 +1,14 @@
 pub trait VideoInterface {
     /// Outputs a single pixel to the interface at the specified location.
-    fn draw_pixel(&self, x: u16, y: u16, color: Color);
+    fn draw_pixel(&mut self, x: u16, y: u16, color: Color);
     /// Signals to the interface that a full frame has been sent.
-    fn end_of_frame(&self);
-}
-
-impl<V: VideoInterface> VideoInterface for &V {
-    fn draw_pixel(&self, x: u16, y: u16, color: Color) {
-        (**self).draw_pixel(x, y, color)
-    }
-    fn end_of_frame(&self) {
-        (**self).end_of_frame()
-    }
+    fn end_of_frame(&mut self);
 }
 
 pub struct DummyVideo();
 impl VideoInterface for DummyVideo {
-    fn draw_pixel(&self, _x: u16, _y: u16, _color: Color) {}
-    fn end_of_frame(&self) {}
+    fn draw_pixel(&mut self, _x: u16, _y: u16, _color: Color) {}
+    fn end_of_frame(&mut self) {}
 }
 
 /// Represents an RGB color

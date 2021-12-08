@@ -46,11 +46,11 @@ struct NesVideoWrapper<V> {
 
 impl<V: VideoInterface> VideoInterface for NesVideoWrapper<V> {
     #[inline]
-    fn draw_pixel(&self, x: u16, y: u16, color: Color) {
+    fn draw_pixel(&mut self, x: u16, y: u16, color: Color) {
         self.screen.draw_pixel(x, y, color);
     }
     #[inline]
-    fn end_of_frame(&self) {
+    fn end_of_frame(&mut self) {
         self.frame_completed.set(true);
         self.screen.end_of_frame();
     }

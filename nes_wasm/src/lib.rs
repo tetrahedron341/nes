@@ -14,7 +14,7 @@ use wasm_bindgen::JsCast;
 #[wasm_bindgen]
 extern "C" {
     #[wasm_bindgen(js_name = "queueAudio")]
-    fn queue_audio(samples: &mut [f32]);
+    fn queue_audio(samples: &[f32]);
 }
 
 #[wasm_bindgen(start, skip_typescript)]
@@ -121,7 +121,7 @@ struct CanvasOutput {
 }
 
 impl VideoInterface for CanvasOutput {
-    fn draw_pixel(&self, x: u16, y: u16, color: Color) {
+    fn draw_pixel(&mut self, x: u16, y: u16, color: Color) {
         if y >= 240 {
             return;
         }
@@ -141,7 +141,7 @@ impl VideoInterface for CanvasOutput {
             frame[pix_off + 3] = 255;
         }
     }
-    fn end_of_frame(&self) {
+    fn end_of_frame(&mut self) {
         let ctx = get_canvas_context();
         let frame = self.frame.read().unwrap();
         let frame_copy = {
@@ -174,7 +174,7 @@ impl Default for Audio {
 }
 
 impl AudioOutput for Audio {
-    fn queue_audio(&mut self, samples: &mut [f32]) -> Result<(), String> {
+    fn queue_audio(&mut self, samples: &[f32]) -> Result<(), String> {
         queue_audio(samples);
 
         Ok(())
