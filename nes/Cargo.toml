@@ -1,13 +1,15 @@
 [package]
 name = "nes"
-version = "0.1.0"
+version = "0.2.0-alpha01"
 authors = ["bengdahl <bengdahl341@gmail.com>"]
-edition = "2018"
+edition = "2021"
 # build = "build.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-# structopt = { version = "0.3.4", default-features = false }
+anyhow = "1.0.51"
+cpal = "0.13.4"
 nes_core = { path = "../nes_core" }
-sdl2 = "0.32.2"
+wgpu = "0.11.1"
+winit = "0.26.0"

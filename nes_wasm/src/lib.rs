@@ -144,13 +144,13 @@ impl VideoInterface for CanvasOutput {
     fn end_of_frame(&self) {
         let ctx = get_canvas_context();
         let frame = self.frame.read().unwrap();
-        let mut frame_copy = {
+        let frame_copy = {
             let mut _fc = [0; 512 * 480 * 4];
             assert!(frame.len() == 512 * 480 * 4);
             _fc.copy_from_slice(&frame[..512 * 480 * 4]);
             _fc
         };
-        let clamped = wasm_bindgen::Clamped(&mut frame_copy[..]);
+        let clamped = wasm_bindgen::Clamped(&frame_copy[..]);
         let image_data = web_sys::ImageData::new_with_u8_clamped_array(clamped, 512).unwrap();
         ctx.put_image_data(&image_data, 0., 0.).unwrap();
     }

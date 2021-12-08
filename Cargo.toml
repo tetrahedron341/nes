@@ -1,6 +1,3 @@
 [workspace]
-members = [
-    "nes_core",
-    "nes",
-    "nes_wasm"
-]
+resolver = "2"
+members = ["nes_core", "nes", "nes_wasm"]
