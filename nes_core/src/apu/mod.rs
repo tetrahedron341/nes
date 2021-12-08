@@ -333,7 +333,7 @@ impl<T: AudioOutput> APU<T> {
     }
 
     fn queue_samples(&mut self) -> Result<()> {
-        self.sample_out.queue_audio(&mut self.sample_buffer[..])?;
+        self.sample_out.queue_audio(&self.sample_buffer[..])?;
         self.sample_buffer.clear();
         Ok(())
     }

@@ -82,7 +82,7 @@ impl AudioPlayer {
 pub struct Audio {}
 
 impl nes_core::apu::AudioOutput for Audio {
-    fn queue_audio(&mut self, samples: &mut [f32]) -> Result<(), String> {
+    fn queue_audio(&mut self, samples: &[f32]) -> Result<(), String> {
         todo!()
     }
     fn sample_rate(&self) -> usize {
