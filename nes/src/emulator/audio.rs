@@ -79,6 +79,7 @@ impl AudioPlayer {
     }
 }
 
+#[derive(Default)]
 pub struct Audio {}
 
 impl nes_core::apu::AudioOutput for Audio {

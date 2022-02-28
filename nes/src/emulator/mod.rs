@@ -1,126 +1,124 @@
 mod audio;
+mod components;
 mod controller;
 mod screen;
 
-use audio::Audio;
 use controller::Controller;
+use iced::{Application, Length};
 use screen::Screen;
 
 use anyhow::Result;
-use nes_core::controller::ControllerState;
-use nes_core::nes::NesSaveState;
-use winit::event::{ElementState, KeyboardInput, VirtualKeyCode};
 
-type Nes = nes_core::nes::Nes<Screen, Controller, Audio>;
+type Nes = nes_core::nes::Nes<Screen, Controller, nes_core::apu::DummyAudio>;
+
+enum AppState {
+    Empty,
+    Running,
+    Paused,
+}
+
+pub struct Flags {
+    pub rom_path: Option<String>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Message {
+    NextFrame,
+}
 
 struct App {
-    event_loop: Option<winit::event_loop::EventLoop<AppEvent>>,
-    el_proxy: winit::event_loop::EventLoopProxy<AppEvent>,
-    audio_thread: audio::AudioPlayer,
+    state: AppState,
     nes: Nes,
 }
 
-impl App {
-    fn new(rom_path: String) -> Result<Self> {
-        let event_loop = winit::event_loop::EventLoop::with_user_event();
-        let el_proxy = event_loop.create_proxy();
+impl iced::Application for App {
+    type Executor = iced::executor::Default;
+    type Flags = Flags;
+    type Message = Message;
 
-        let cart = nes_core::cart::Cart::from_file(rom_path)?;
-        let screen = Screen::new(&event_loop)?;
-        let controller = Controller::new();
-        let audio = audio::Audio {};
-        let audio_thread = audio::AudioPlayer::new()?;
-        let config = None;
-        let nes = Nes::new(cart, screen, controller, audio, config);
+    fn new(flags: Self::Flags) -> (Self, iced::Command<Self::Message>) {
+        let mut app = App {
+            state: AppState::Empty,
+            nes: Nes::new(
+                None,
+                Screen::default(),
+                Controller::default(),
+                nes_core::apu::DummyAudio(),
+                None,
+            ),
+        };
 
-        Ok(App {
-            event_loop: Some(event_loop),
-            el_proxy,
-            nes,
-            audio_thread,
-        })
-    }
-
-    fn update_title(&self) {
-        self.screen().as_window().set_title(&format!(
-            "NES - Vol: {}%",
-            self.audio_thread.get_volume() / 10
-        ));
-    }
-
-    fn screen(&self) -> &Screen {
-        self.nes.get_screen()
-    }
-
-    fn check_window(&self, window_id: winit::window::WindowId) -> Option<AppWindow> {
-        if self.screen().as_window().id() == window_id {
-            Some(AppWindow::Screen)
-        } else {
-            None
+        if let Some(rom_path) = flags.rom_path {
+            let cart = nes_core::cart::Cart::from_file(rom_path).unwrap();
+            app.state = AppState::Running;
+            app.nes.mmu.cart = Some(cart);
         }
+
+        (app, iced::Command::none())
     }
 
-    fn handle_kbd(&mut self, input: KeyboardInput) {
-        match input {
-            KeyboardInput {
-                virtual_keycode: Some(VirtualKeyCode::Plus),
-                state: ElementState::Pressed,
-                ..
-            } => self.el_proxy.send_event(AppEvent::VolumeUp).unwrap(),
-            KeyboardInput {
-                virtual_keycode: Some(VirtualKeyCode::Minus),
-                state: ElementState::Pressed,
-                ..
-            } => self.el_proxy.send_event(AppEvent::VolumeDown).unwrap(),
-            _ => (),
+    fn title(&self) -> String {
+        format!("")
+    }
+
+    fn update(
+        &mut self,
+        message: Self::Message,
+        clipboard: &mut iced::Clipboard,
+    ) -> iced::Command<Self::Message> {
+        match message {
+            Message::NextFrame => self.nes.run_frame().unwrap(),
         }
+
+        iced::Command::none()
     }
 
-    fn run(mut self) -> ! {
-        self.update_title();
-        self.event_loop.take().unwrap().run(move |ev, _, cf| {
-            use winit::event::{Event, WindowEvent};
-            use winit::event_loop::ControlFlow;
-            match ev {
-                Event::WindowEvent { event, .. } => match event {
-                    WindowEvent::CloseRequested => {
-                        *cf = ControlFlow::Exit;
-                    }
-                    WindowEvent::KeyboardInput { input, .. } => self.handle_kbd(input),
-                    _ => (),
-                },
-                Event::RedrawRequested(wid) => match self.check_window(wid) {
-                    Some(AppWindow::Screen) => (),
-                    None => (),
-                },
-                Event::UserEvent(event) => match event {
-                    AppEvent::VolumeUp => {
-                        dbg!(self.audio_thread.change_volume(100));
-                        self.update_title();
-                    }
-                    AppEvent::VolumeDown => {
-                        dbg!(self.audio_thread.change_volume(-100));
-                        self.update_title();
-                    }
-                },
-                _ => (),
-            }
-        })
+    fn view(&mut self) -> iced::Element<'_, Self::Message> {
+        let screen = self.nes.get_screen().get_frame();
+        let pixels = Vec::from(&screen[..]);
+
+        let image = iced::Image::new(iced::image::Handle::from_pixels(
+            screen::SCREEN_WIDTH as u32,
+            screen::SCREEN_HEIGHT as u32,
+            pixels,
+        ))
+        .height(Length::Fill)
+        .width(Length::Fill);
+
+        iced::Container::new(image)
+            .width(Length::Fill)
+            .height(Length::Fill)
+            .center_x()
+            .center_y()
+            .into()
+    }
+
+    fn subscription(&self) -> iced::Subscription<Self::Message> {
+        iced::Subscription::batch([
+            iced_native::subscription::events_with(|e, _| match e {
+                iced_native::Event::Keyboard(iced_native::keyboard::Event::KeyPressed {
+                    key_code: iced_native::keyboard::KeyCode::F,
+                    ..
+                }) => Some(Message::NextFrame),
+
+                _ => None,
+            }),
+            iced::time::every(std::time::Duration::from_micros(16667)).map(|_| Message::NextFrame),
+        ])
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-enum AppWindow {
-    Screen,
-}
-
-#[derive(Debug, Clone, Copy)]
-enum AppEvent {
-    VolumeUp,
-    VolumeDown,
-}
-
-pub fn run(rom_name: String) -> Result<()> {
-    let app = App::new(rom_name)?;
-    app.run()
+pub fn run(flags: Flags) -> Result<()> {
+    App::run(iced::Settings {
+        flags,
+        antialiasing: true,
+        default_font: None,
+        default_text_size: 20,
+        exit_on_close_request: true,
+        window: iced::window::Settings {
+            size: (256, 240),
+            ..Default::default()
+        },
+    })?;
+    Ok(())
 }

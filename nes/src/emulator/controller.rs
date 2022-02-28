@@ -13,6 +13,12 @@ impl Controller {
     }
 }
 
+impl Default for Controller {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl nes_core::controller::NESController for Controller {
     fn poll_controller(&self) -> ControllerState {
         *self.buttons.read().unwrap()
