@@ -478,11 +478,11 @@ impl PPU {
         }
 
         let color = self.read_palette_ram((palette << 2 | pixel) as usize);
-        video_out.draw_pixel(
-            self.dot.wrapping_sub(1),
-            self.scanline,
-            self.convert_color_to_rgb(color),
-        );
+        let pixel_x = self.dot.wrapping_sub(1);
+        let pixel_y = self.scanline;
+        if pixel_x < 256 && pixel_y < 240 {
+            video_out.draw_pixel(pixel_x, pixel_y, self.convert_color_to_rgb(color));
+        }
 
         self.dot += 1;
         if self.dot > 340 {
