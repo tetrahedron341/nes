@@ -9,6 +9,8 @@ use controller::Controller;
 use iced::{Application, Length};
 use screen::Screen;
 
+use self::audio::AudioPlayer;
+
 type Nes = nes_core::nes::Nes<Screen, Controller, nes_core::apu::DummyAudio>;
 
 #[derive(Debug, PartialEq)]
@@ -33,6 +35,8 @@ enum Message {
 struct App {
     state: AppState,
     nes: Nes,
+    audio_player: audio::AudioPlayer,
+    game_title: String,
 }
 
 impl iced::Application for App {
@@ -50,6 +54,8 @@ impl iced::Application for App {
                 nes_core::apu::DummyAudio(),
                 None,
             ),
+            audio_player: AudioPlayer::new().unwrap(),
+            game_title: flags.rom_path.as_ref().cloned().unwrap_or_default(),
         };
 
         if let Some(rom_path) = flags.rom_path {
@@ -62,7 +68,12 @@ impl iced::Application for App {
     }
 
     fn title(&self) -> String {
-        format!("")
+        let mut t = String::new();
+        t += &self.game_title;
+        if self.state == AppState::Paused {
+            t += " - PAUSE";
+        }
+        t
     }
 
     fn update(

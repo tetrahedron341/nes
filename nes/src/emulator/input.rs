@@ -107,6 +107,7 @@ pub struct InputHandler {
     reverse_map: HashMap<KeyCode, Result<Input, DuplicateInputs>>,
 }
 
+#[allow(unused)]
 impl InputHandler {
     pub fn from_keymaps(keymaps: HashMap<Input, KeyCode>) -> Self {
         let mut s = InputHandler {
