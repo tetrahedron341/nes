@@ -11,6 +11,7 @@ use screen::Screen;
 
 type Nes = nes_core::nes::Nes<Screen, Controller, nes_core::apu::DummyAudio>;
 
+#[derive(Debug, PartialEq)]
 enum AppState {
     Empty,
     Running,
@@ -70,7 +71,11 @@ impl iced::Application for App {
         _clipboard: &mut iced::Clipboard,
     ) -> iced::Command<Self::Message> {
         match message {
-            Message::NextFrame => self.nes.run_frame().unwrap(),
+            Message::NextFrame => {
+                if self.state == AppState::Running {
+                    self.nes.run_frame().unwrap()
+                }
+            }
             Message::ControllerButtonPressed(b) => self.nes.get_controller_mut().buttons |= b,
             Message::ControllerButtonReleased(b) => self.nes.get_controller_mut().buttons &= !b,
             Message::TogglePause => match self.state {
