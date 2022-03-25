@@ -1926,6 +1926,7 @@ dependencies = [
  "cpal",
  "iced",
  "iced_native",
+ "lazy_static",
  "nes_core",
  "rtrb",
 ]

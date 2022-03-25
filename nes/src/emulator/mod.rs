@@ -1,13 +1,13 @@
 mod audio;
 mod components;
 mod controller;
+mod input;
 mod screen;
 
+use anyhow::Result;
 use controller::Controller;
 use iced::{Application, Length};
 use screen::Screen;
-
-use anyhow::Result;
 
 type Nes = nes_core::nes::Nes<Screen, Controller, nes_core::apu::DummyAudio>;
 
@@ -24,6 +24,9 @@ pub struct Flags {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Message {
     NextFrame,
+    ControllerButtonPressed(nes_core::controller::ControllerState),
+    ControllerButtonReleased(nes_core::controller::ControllerState),
+    TogglePause,
 }
 
 struct App {
@@ -64,10 +67,17 @@ impl iced::Application for App {
     fn update(
         &mut self,
         message: Self::Message,
-        clipboard: &mut iced::Clipboard,
+        _clipboard: &mut iced::Clipboard,
     ) -> iced::Command<Self::Message> {
         match message {
             Message::NextFrame => self.nes.run_frame().unwrap(),
+            Message::ControllerButtonPressed(b) => self.nes.get_controller_mut().buttons |= b,
+            Message::ControllerButtonReleased(b) => self.nes.get_controller_mut().buttons &= !b,
+            Message::TogglePause => match self.state {
+                AppState::Running => self.state = AppState::Paused,
+                AppState::Paused => self.state = AppState::Running,
+                _ => (),
+            },
         }
 
         iced::Command::none()
@@ -95,14 +105,7 @@ impl iced::Application for App {
 
     fn subscription(&self) -> iced::Subscription<Self::Message> {
         iced::Subscription::batch([
-            iced_native::subscription::events_with(|e, _| match e {
-                iced_native::Event::Keyboard(iced_native::keyboard::Event::KeyPressed {
-                    key_code: iced_native::keyboard::KeyCode::F,
-                    ..
-                }) => Some(Message::NextFrame),
-
-                _ => None,
-            }),
+            iced_native::subscription::events_with(input::event_handler),
             iced::time::every(std::time::Duration::from_micros(16667)).map(|_| Message::NextFrame),
         ])
     }
