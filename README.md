@@ -3,25 +3,31 @@
 Yep
 
 # Features
-* SDL and WASM frontend
-* A whole two mappers
-* One save-state slot
-* Runs at 60FPS on a decent machine
+
+-   Native frontend using `iced`
+-   WASM frontend
+-   One save-state slot
+-   Runs at 60FPS
 
 ## CPU
-* All of the official opcodes
-* Shits the bed if it even looks at an illegal opcode
+
+-   All of the official opcodes are correctly implemented and tested
 
 ## PPU
-* (mostly) Accurate emulation of both sprites and background
+
+-   Fully implemented
+-   Mostly accurate
 
 ## APU
-* Has square channels #1 and #2
-* Has the triangle channel
-* Has the noise channel
-* Makes funky popping noises
+
+-   Has square channels #1 and #2, triangle channel, and noise channel
+-   DMC emulation eventually
+-   Native frontend no longer makes funky popping noises
+-   WASM frontend needs a bit of work
 
 ## Mapper list
-* NROM (0)
-* MMC1 (1)
 
+-   NROM (0)
+-   MMC1 (1)
+-   UxROM (2)
+-   AxROM (7)

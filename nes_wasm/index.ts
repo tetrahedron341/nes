@@ -55,9 +55,9 @@ async function main() {
             case 'KeyX':
                 return 'b';
             case 'KeyG':
-                return 'select';
-            case 'KeyH':
                 return 'start';
+            case 'KeyH':
+                return 'select';
             case 'ArrowUp':
                 return 'up';
             case 'ArrowRight':
