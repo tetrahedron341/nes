@@ -4,7 +4,7 @@ use std::sync::{
 };
 
 use anyhow::{Context, Result};
-use cpal::{traits::*, SampleFormat, SampleRate};
+use cpal::traits::*;
 use rtrb::chunks::ChunkError;
 
 type CpalDataCallback =
@@ -62,7 +62,6 @@ impl AudioPlayer {
         let audio = Audio {
             sample_rate: dbg!(config).sample_rate.0 as usize,
             buffer: p,
-            record: std::fs::File::create("nes_apu_log.raw").unwrap(),
         };
 
         Ok((player, audio))
@@ -89,7 +88,6 @@ impl AudioPlayer {
 
 pub struct Audio {
     buffer: rtrb::Producer<f32>,
-    record: std::fs::File,
     sample_rate: usize,
 }
 
