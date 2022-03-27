@@ -30,6 +30,7 @@ enum Message {
     ControllerButtonPressed(nes_core::controller::ControllerState),
     ControllerButtonReleased(nes_core::controller::ControllerState),
     TogglePause,
+    VolumeChange(i16),
 }
 
 struct App {
@@ -74,6 +75,7 @@ impl iced::Application for App {
         if self.state == AppState::Paused {
             t += " - PAUSE";
         }
+        t += &format!(" - Vol: {}%", self.audio_player.get_volume() / 10);
         t
     }
 
@@ -91,6 +93,9 @@ impl iced::Application for App {
                 AppState::Paused => self.state = AppState::Running,
                 _ => (),
             },
+            Message::VolumeChange(dv) => {
+                self.audio_player.change_volume(dv);
+            }
         }
 
         iced::Command::none()

@@ -18,6 +18,8 @@ const INPUTS_LIST: &[Input] = {
         ButtonLeft,
         ButtonRight,
         Pause,
+        VolumeUp,
+        VolumeDown,
     ]
 };
 
@@ -59,6 +61,8 @@ pub enum Input {
     ButtonRight,
 
     Pause,
+    VolumeUp,
+    VolumeDown,
 }
 
 impl Input {
@@ -76,6 +80,8 @@ impl Input {
             ButtonRight => Some(Message::ControllerButtonPressed(ControllerState::RIGHT)),
 
             Pause => Some(Message::TogglePause),
+            VolumeUp => Some(Message::VolumeChange(50)),
+            VolumeDown => Some(Message::VolumeChange(-50)),
         }
     }
 
@@ -92,7 +98,7 @@ impl Input {
             ButtonLeft => Some(Message::ControllerButtonReleased(ControllerState::LEFT)),
             ButtonRight => Some(Message::ControllerButtonReleased(ControllerState::RIGHT)),
 
-            Pause => None,
+            _ => None,
         }
     }
 }
@@ -223,6 +229,8 @@ impl Default for InputHandler {
             (Input::ButtonLeft, KeyCode::Left),
             (Input::ButtonRight, KeyCode::Right),
             (Input::Pause, KeyCode::P),
+            (Input::VolumeUp, KeyCode::Equals),
+            (Input::VolumeDown, KeyCode::Minus),
         ]);
         InputHandler::from_keymaps(keymaps)
     }

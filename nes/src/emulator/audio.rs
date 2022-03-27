@@ -11,6 +11,7 @@ type CpalDataCallback =
     Box<dyn for<'a, 'b> FnMut(&'a mut [f32], &'b cpal::OutputCallbackInfo) + Send>;
 
 pub struct AudioPlayer {
+    #[allow(dead_code)]
     stream: Box<dyn cpal::traits::StreamTrait>,
     pub volume: Arc<AtomicU16>,
 }
@@ -26,7 +27,7 @@ impl AudioPlayer {
             ..device.default_output_config()?.config()
         };
 
-        let volume = Arc::new(AtomicU16::new(100));
+        let volume = Arc::new(AtomicU16::new(500));
 
         let error_callback = |e| panic!("{}", e);
 
@@ -36,7 +37,7 @@ impl AudioPlayer {
             let volume = volume.clone();
             let channels = config.channels as usize;
             Box::new(move |buffer, _out_info| {
-                let v = volume.load(Ordering::SeqCst) as f32 / 500.0;
+                let v = volume.load(Ordering::SeqCst) as f32 / 100.0;
                 let chunk = match c.read_chunk(buffer.len() / channels) {
                     Ok(chunk) => chunk,
                     Err(ChunkError::TooFewSlots(ready_samples)) => {
