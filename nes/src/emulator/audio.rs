@@ -4,18 +4,19 @@ use std::sync::{
 };
 
 use anyhow::{Context, Result};
-use cpal::traits::*;
+use cpal::{traits::*, SampleFormat, SampleRate};
+use rtrb::chunks::ChunkError;
 
 type CpalDataCallback =
     Box<dyn for<'a, 'b> FnMut(&'a mut [f32], &'b cpal::OutputCallbackInfo) + Send>;
 
 pub struct AudioPlayer {
     stream: Box<dyn cpal::traits::StreamTrait>,
-    volume: Arc<AtomicU16>,
+    pub volume: Arc<AtomicU16>,
 }
 
 impl AudioPlayer {
-    pub fn new() -> Result<Self> {
+    pub fn new() -> Result<(Self, Audio)> {
         let host = cpal::default_host();
         let device = host
             .default_output_device()
@@ -29,35 +30,42 @@ impl AudioPlayer {
 
         let error_callback = |e| panic!("{}", e);
 
+        let (p, mut c) = rtrb::RingBuffer::<f32>::new(65536);
+
         let data_callback: CpalDataCallback = {
-            let elapsed = Box::leak(Box::new(0.0));
-            let t_per_sample = 1.0 / (config.sample_rate.0 as f32);
             let volume = volume.clone();
+            let channels = config.channels as usize;
             Box::new(move |buffer, _out_info| {
-                let v = volume.load(Ordering::SeqCst) as f32 / 1000.0;
-                // println!("audio callback, t = {}, v = {}", t, v);
-                #[inline]
-                fn square_wave(t: f32) -> f32 {
-                    if t % 1.0 < 0.5 {
-                        2.0 * (t % 1.0)
-                    } else {
-                        2.0 - 2.0 * (t % 1.0)
+                let v = volume.load(Ordering::SeqCst) as f32 / 500.0;
+                let chunk = match c.read_chunk(buffer.len() / channels) {
+                    Ok(chunk) => chunk,
+                    Err(ChunkError::TooFewSlots(ready_samples)) => {
+                        // println!("[{:?}] stalling!", std::time::Instant::now());
+                        c.read_chunk(ready_samples).unwrap()
+                    }
+                };
+                for (i, s) in chunk.into_iter().enumerate() {
+                    for c in 0..channels {
+                        buffer[channels * i + c] = s * v;
                     }
                 }
-                buffer.iter_mut().enumerate().for_each(|(i, b)| {
-                    let t = *elapsed + i as f32 * t_per_sample;
-                    *b = square_wave(t * 220.0) * (f32::sin(t / 2.).powi(2)) * v * 0.33;
-                });
-                *elapsed += buffer.len() as f32 * t_per_sample;
             })
         };
         let stream = device.build_output_stream(&config, data_callback, error_callback)?;
         stream.play()?;
 
-        Ok(AudioPlayer {
+        let player = AudioPlayer {
             stream: Box::new(stream),
             volume,
-        })
+        };
+
+        let audio = Audio {
+            sample_rate: dbg!(config).sample_rate.0 as usize,
+            buffer: p,
+            record: std::fs::File::create("nes_apu_log.raw").unwrap(),
+        };
+
+        Ok((player, audio))
     }
 
     /// Set the volume. Automatically clamps volume between 0..=1000.
@@ -79,14 +87,29 @@ impl AudioPlayer {
     }
 }
 
-#[derive(Default)]
-pub struct Audio {}
+pub struct Audio {
+    buffer: rtrb::Producer<f32>,
+    record: std::fs::File,
+    sample_rate: usize,
+}
 
 impl nes_core::apu::AudioOutput for Audio {
     fn queue_audio(&mut self, samples: &[f32]) -> Result<(), String> {
-        todo!()
+        match self.buffer.write_chunk_uninit(samples.len()) {
+            Ok(chunk) => {
+                chunk.fill_from_iter(samples.iter().copied());
+            }
+            Err(ChunkError::TooFewSlots(available)) => {
+                // println!("[{:?}] rushing!", std::time::Instant::now());
+                self.buffer
+                    .write_chunk_uninit(available)
+                    .unwrap()
+                    .fill_from_iter(samples.iter().copied());
+            }
+        }
+        Ok(())
     }
     fn sample_rate(&self) -> usize {
-        todo!()
+        self.sample_rate
     }
 }

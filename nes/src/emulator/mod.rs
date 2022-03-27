@@ -4,14 +4,13 @@ mod controller;
 mod input;
 mod screen;
 
+use self::audio::{Audio, AudioPlayer};
 use anyhow::Result;
 use controller::Controller;
 use iced::{Application, Length};
 use screen::Screen;
 
-use self::audio::AudioPlayer;
-
-type Nes = nes_core::nes::Nes<Screen, Controller, nes_core::apu::DummyAudio>;
+type Nes = nes_core::nes::Nes<Screen, Controller, Audio>;
 
 #[derive(Debug, PartialEq)]
 enum AppState {
@@ -46,16 +45,17 @@ impl iced::Application for App {
     type Message = Message;
 
     fn new(flags: Self::Flags) -> (Self, iced::Command<Self::Message>) {
+        let (audio_player, nes_audio) = AudioPlayer::new().unwrap();
         let mut app = App {
             state: AppState::Empty,
             nes: Nes::new(
                 None,
                 Screen::default(),
                 Controller::default(),
-                nes_core::apu::DummyAudio(),
+                nes_audio,
                 None,
             ),
-            audio_player: AudioPlayer::new().unwrap(),
+            audio_player,
             game_title: flags.rom_path.as_ref().cloned().unwrap_or_default(),
         };
 
