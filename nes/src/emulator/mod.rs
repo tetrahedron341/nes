@@ -20,6 +20,7 @@ enum AppState {
     Paused,
 }
 
+#[derive(Default)]
 pub struct Flags {
     pub rom_path: Option<String>,
 }
@@ -76,11 +77,7 @@ impl iced::Application for App {
         t
     }
 
-    fn update(
-        &mut self,
-        message: Self::Message,
-        _clipboard: &mut iced::Clipboard,
-    ) -> iced::Command<Self::Message> {
+    fn update(&mut self, message: Self::Message) -> iced::Command<Self::Message> {
         match message {
             Message::NextFrame => {
                 if self.state == AppState::Running {
@@ -138,6 +135,7 @@ pub fn run(flags: Flags) -> Result<()> {
             size: (256, 240),
             ..Default::default()
         },
+        ..Default::default()
     })?;
     Ok(())
 }
