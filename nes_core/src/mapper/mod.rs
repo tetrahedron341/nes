@@ -1,6 +1,7 @@
 mod axrom;
 pub mod dummy;
 mod mmc1;
+mod mmc3;
 mod nrom;
 mod uxrom;
 
