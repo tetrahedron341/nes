@@ -1,15 +1,5 @@
-// Type declarations have to be pasted here because of webpack/webpack#6615
-/**
-*/
-declare class Nes {
-    free(): void;
-}
-/**
-*/
-declare class NesSaveState {
-    free(): void;
-}
-const rust = import('./pkg/index');
+import { Nes, NesSaveState } from "./pkg/index";
+import * as nes from "./pkg/index";
 
 const NES_WIDTH = 256;
 const NES_HEIGHT = 240;
@@ -22,30 +12,62 @@ const DISPLAY_HEIGHT = NES_HEIGHT * DISPLAY_SCALE;
 const FPS = 60.0;
 
 let audio_ctx = new AudioContext();
-let audio_buf = audio_ctx.createBuffer(1, 4096, 44100);
-let audio_source: AudioBufferSourceNode | null = null;
+let next_frame = null;
+
+let audio_nodes: Array<{buf: AudioBuffer, starts: null|number}> = [
+    {buf: audio_ctx.createBuffer(1, 4096, 44100), starts: null},
+    {buf: audio_ctx.createBuffer(1, 4096, 44100), starts: null},
+    {buf: audio_ctx.createBuffer(1, 4096, 44100), starts: null},
+]
+let audio_next_src: number = 0;
+let audio_next_frame_start: number = 0;
 
 function queueAudio(samples: Float32Array) {
-    if (audio_source != null) {
-        audio_source.stop();
+    if (audio_nodes[audio_next_src].starts) {
+        console.log("RECIEVING SAMPLES TOO FAST, AUDIO FRAME DROPPED");
+        return;
     }
-    let source = audio_ctx.createBufferSource();
-    audio_buf.copyToChannel(samples, 0, 0);
-    source.buffer = audio_buf;
-    source.connect(audio_ctx.destination);
-    source.start();
-    audio_source = source;
+
+    audio_nodes[audio_next_src].buf.copyToChannel(samples, 0, 0);
+
+    let s = new AudioBufferSourceNode(audio_ctx, {buffer: audio_nodes[audio_next_src].buf});
+    s.onended = (function() {this.starts = null;}).bind(audio_nodes[audio_next_src]);
+    s.connect(audio_ctx.destination);
+    let duration = 4096 / 44100;
+    
+    if (audio_next_frame_start<audio_ctx.currentTime) {
+        audio_next_frame_start = audio_ctx.currentTime + 0.05; // Short delay to avoid calling `start` in the past
+    }
+    audio_nodes[audio_next_src].starts = audio_next_frame_start;
+    s.start(audio_next_frame_start, 0, duration);
+
+    audio_next_frame_start += duration;
+    audio_next_src = (audio_next_src + 1) % audio_nodes.length;
 }
 window["queueAudio"] = queueAudio;
 
-async function main() {
-    let nes = await rust;
+function isAudioLagging(): boolean {
+    let now_audio = audio_ctx.currentTime;
+    for (let i = 0; i <audio_nodes.length; i++) {
+        let s = audio_nodes[i].starts;
+        if (s!==null && now_audio < s) {
+            return false;
+        }
+    }
+    return true;
+}
 
+function isAudioSaturated(): boolean {
+    return audio_nodes[audio_next_src].starts !== null;
+}
+
+async function main() {
     let paused = false;
     let anim_frame_id;
     let emulator_error = false;
 
     let emulator: Nes = nes.init_emulator(new nes.Audio());
+
     let saved_state: NesSaveState | null = null;
 
     function key_to_button(key) {
@@ -118,13 +140,21 @@ async function main() {
         var now, elapsed;
 
         function play_frame() {
-            anim_frame_id = requestAnimationFrame(play_frame);
+            if (isAudioSaturated()) {
+                anim_frame_id = requestAnimationFrame(play_frame);
+                return;
+            }
 
-            now = Date.now();
-            elapsed = now - then;
+            while (true && !isAudioLagging()) {
+                now = Date.now();
+                elapsed = now - then;
+                if (elapsed > fpsInterval) {
+                    then = now;
+                    break;
+                }
+            }
 
-            if (!paused && elapsed > fpsInterval) {
-                then = now - (elapsed % fpsInterval);
+            if (!paused) {
                 try {
                     nes.advance_frame(emulator);
                 } catch (e) {
@@ -135,6 +165,8 @@ async function main() {
                     throw e;
                 }
             }
+
+            anim_frame_id = requestAnimationFrame(play_frame);
         }
 
         anim_frame_id = requestAnimationFrame(play_frame);
@@ -207,6 +239,4 @@ async function main() {
     }
 }
 
-main().then(() => {
-
-}).catch(console.error);
+main().catch(console.error);
