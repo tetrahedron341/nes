@@ -22,8 +22,6 @@ Yep
 
 -   Has square channels #1 and #2, triangle channel, and noise channel
 -   DMC emulation eventually
--   Native frontend no longer makes funky popping noises
--   WASM frontend needs a bit of work
 
 ## Mapper list
 
