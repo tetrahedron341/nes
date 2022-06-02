@@ -30,6 +30,3 @@ features = [
     'AudioContext',
     'console',
 ]
-
-[profile.dev]
-opt-level = 3
