@@ -34,6 +34,7 @@ pub fn from_ines_id(id: u16) -> Result<Box<dyn Mapper + Send + Sync>> {
         0 => Ok(Box::new(nrom::NROM::new())),
         1 => Ok(Box::new(mmc1::MMC1::new())),
         2 => Ok(Box::new(uxrom::UxROM::new())),
+        4 => Ok(Box::new(mmc3::MMC3::new())),
 
         7 => Ok(Box::new(axrom::AxROM::new())),
         _ => Err(Error::format_err(format!("Invalid mapper ID: {}", id))),
