@@ -1,5 +1,6 @@
 use crate::cart::Mirroring;
 
+#[derive(Clone)]
 pub struct MMC3 {
     bank_select: BankSelectRegister,
 
@@ -144,12 +145,10 @@ impl super::Mapper for MMC3 {
         }
     }
 
-    fn reset(&mut self) {
-        todo!()
-    }
+    fn reset(&mut self) {}
 
     fn clone(&self) -> Box<dyn super::Mapper + Send + Sync> {
-        todo!()
+        Box::new(Clone::clone(self))
     }
 
     fn mirroring(&self) -> Option<Mirroring> {
