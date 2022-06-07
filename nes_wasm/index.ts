@@ -14,10 +14,10 @@ const FPS = 60.0;
 let audio_ctx = new AudioContext();
 let next_frame = null;
 
-let audio_nodes: Array<{buf: AudioBuffer, starts: null|number}> = [
-    {buf: audio_ctx.createBuffer(1, 4096, 44100), starts: null},
-    {buf: audio_ctx.createBuffer(1, 4096, 44100), starts: null},
-    {buf: audio_ctx.createBuffer(1, 4096, 44100), starts: null},
+let audio_nodes: Array<{ buf: AudioBuffer, starts: null | number }> = [
+    { buf: audio_ctx.createBuffer(1, 4096, 44100), starts: null },
+    { buf: audio_ctx.createBuffer(1, 4096, 44100), starts: null },
+    { buf: audio_ctx.createBuffer(1, 4096, 44100), starts: null },
 ]
 let audio_next_src: number = 0;
 let audio_next_frame_start: number = 0;
@@ -30,12 +30,12 @@ function queueAudio(samples: Float32Array) {
 
     audio_nodes[audio_next_src].buf.copyToChannel(samples, 0, 0);
 
-    let s = new AudioBufferSourceNode(audio_ctx, {buffer: audio_nodes[audio_next_src].buf});
-    s.onended = (function() {this.starts = null;}).bind(audio_nodes[audio_next_src]);
+    let s = new AudioBufferSourceNode(audio_ctx, { buffer: audio_nodes[audio_next_src].buf });
+    s.onended = (function () { this.starts = null; }).bind(audio_nodes[audio_next_src]);
     s.connect(audio_ctx.destination);
     let duration = 4096 / 44100;
-    
-    if (audio_next_frame_start<audio_ctx.currentTime) {
+
+    if (audio_next_frame_start < audio_ctx.currentTime) {
         audio_next_frame_start = audio_ctx.currentTime + 0.05; // Short delay to avoid calling `start` in the past
     }
     audio_nodes[audio_next_src].starts = audio_next_frame_start;
@@ -48,9 +48,9 @@ window["queueAudio"] = queueAudio;
 
 function isAudioLagging(): boolean {
     let now_audio = audio_ctx.currentTime;
-    for (let i = 0; i <audio_nodes.length; i++) {
+    for (let i = 0; i < audio_nodes.length; i++) {
         let s = audio_nodes[i].starts;
-        if (s!==null && now_audio < s) {
+        if (s !== null && now_audio < s) {
             return false;
         }
     }
@@ -62,6 +62,8 @@ function isAudioSaturated(): boolean {
 }
 
 async function main() {
+    nes.initialize();
+
     let paused = false;
     let anim_frame_id;
     let emulator_error = false;
@@ -239,4 +241,4 @@ async function main() {
     }
 }
 
-main().catch(console.error);
+main();

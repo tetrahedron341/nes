@@ -17,7 +17,7 @@ extern "C" {
     fn queue_audio(samples: &[f32]);
 }
 
-#[wasm_bindgen(start, skip_typescript)]
+#[wasm_bindgen]
 pub fn initialize() {
     console_error_panic_hook::set_once();
 }
