@@ -37,7 +37,7 @@ impl AudioPlayer {
             let volume = volume.clone();
             let channels = config.channels as usize;
             Box::new(move |buffer, _out_info| {
-                let v = volume.load(Ordering::SeqCst) as f32 / 100.0;
+                let v = volume.load(Ordering::SeqCst) as f32 / 1000.0;
                 let chunk = match c.read_chunk(buffer.len() / channels) {
                     Ok(chunk) => chunk,
                     Err(ChunkError::TooFewSlots(ready_samples)) => {
