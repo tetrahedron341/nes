@@ -16,7 +16,7 @@ type Nes = nes_core::nes::Nes<Screen, Controller, Audio>;
 enum AppState {
     Empty,
     Running,
-    Paused,
+    Paused { was_muted: bool },
 }
 
 #[derive(Default)]
@@ -73,7 +73,7 @@ impl iced::Application for App {
     fn title(&self) -> String {
         let mut t = String::new();
         t += &self.game_title;
-        if self.state == AppState::Paused {
+        if let AppState::Paused { .. } = self.state {
             t += " - PAUSE";
         }
         t += &format!(" - Vol: {}%", self.audio_player.get_volume() / 10);
@@ -90,8 +90,14 @@ impl iced::Application for App {
             Message::ControllerButtonPressed(b) => self.nes.get_controller_mut().buttons |= b,
             Message::ControllerButtonReleased(b) => self.nes.get_controller_mut().buttons &= !b,
             Message::TogglePause => match self.state {
-                AppState::Running => self.state = AppState::Paused,
-                AppState::Paused => self.state = AppState::Running,
+                AppState::Running => {
+                    let was_muted = self.audio_player.set_mute(true);
+                    self.state = AppState::Paused { was_muted };
+                }
+                AppState::Paused { was_muted } => {
+                    self.audio_player.set_mute(was_muted);
+                    self.state = AppState::Running;
+                }
                 _ => (),
             },
             Message::VolumeChange(dv) => {

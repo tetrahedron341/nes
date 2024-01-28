@@ -1,6 +1,6 @@
 use std::sync::{
     atomic::{AtomicU16, Ordering},
-    Arc,
+    Arc, Mutex,
 };
 
 use color_eyre::eyre::{ContextCompat, Result};
@@ -13,6 +13,8 @@ type CpalDataCallback =
 pub struct AudioPlayer {
     #[allow(dead_code)]
     stream: Box<dyn cpal::traits::StreamTrait>,
+    /// If muted, stores the volume to be used once unmuted. [`None`] otherwise.
+    mute_volume: Mutex<Option<u16>>,
     pub volume: Arc<AtomicU16>,
 }
 
@@ -58,6 +60,7 @@ impl AudioPlayer {
         let player = AudioPlayer {
             stream: Box::new(stream),
             volume,
+            mute_volume: Mutex::new(None),
         };
 
         let audio = Audio {
@@ -69,9 +72,31 @@ impl AudioPlayer {
     }
 
     /// Set the volume. Automatically clamps volume between 0..=1000.
+    #[allow(unused)]
     pub fn set_volume(&self, v: u16) {
         let v = v.clamp(0, 1000);
         self.volume.store(v, Ordering::SeqCst);
+    }
+
+    /// Mute or unmute. Returns previous mute state.
+    pub fn set_mute(&self, mute: bool) -> bool {
+        let mut mute_volume = self.mute_volume.lock().unwrap();
+        match *mute_volume {
+            None => {
+                if mute {
+                    let vol = self.volume.swap(0, Ordering::AcqRel);
+                    *mute_volume = Some(vol);
+                }
+                false
+            }
+            Some(vol) => {
+                if !mute {
+                    self.volume.store(vol, Ordering::Release);
+                    *mute_volume = None;
+                }
+                true
+            }
+        }
     }
 
     /// Add `dv` to the volume. Returns new volume. Automatically clamps voluime between 0..=1000.
