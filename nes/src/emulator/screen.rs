@@ -41,9 +41,9 @@ impl nes_core::ppu::VideoInterface for Screen {
         for y in PIX_SCALE * y..PIX_SCALE * (y + 1) {
             for x in PIX_SCALE * x..PIX_SCALE * (x + 1) {
                 let offset = (y * SCREEN_WIDTH + x) * 4;
-                self.back[offset] = color.2; // B
+                self.back[offset] = color.0; // R
                 self.back[offset + 1] = color.1; // G
-                self.back[offset + 2] = color.0; // R
+                self.back[offset + 2] = color.2; // B
                 self.back[offset + 3] = 0xFF; // A
             }
         }
