@@ -32,6 +32,8 @@
                 width: 50px;
                 margin: 2px;
                 cursor: pointer;
+                font-size: 2em;
+                font-weight: 200%;
             }
             #control_panel > button:active {
                 background-color: cyan;
@@ -60,15 +62,15 @@
                 padding: 15px;
             }
         </style>
-        <script src="https://kit.fontawesome.com/2947ccfe00.js" crossorigin="anonymous"></script>
+        <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
     <script defer src="index.js"></script></head>
     <body>
         <div id="control_panel">
-            <button onclick="reset_emulator()" title="Reset"><i class="fas fa-2x fa-redo" title="Reset"></i></button>
-            <button onclick="toggle_pause()" title="Pause (p)"><i id="pause_button" class="fas fa-2x fa-pause" title="Pause (p)"></i></button>
-            <button onclick="save_state()" title="Save State"><i class="fas fa-2x fa-download" title="Save State"></i></button>
-            <button onclick="load_state()" title="Load State"><i id="load_button" class="fas fa-2x fa-upload" title="Load State"></i></button>
-            <button onclick="toggle_info()" title="Info"><i class="fas fa-2x fa-info" title="Info"></i></button>
+            <button onclick="reset_emulator()" title="Reset"><i class="bi-rewind-fill" title="Reset"></i></button>
+            <button onclick="toggle_pause()" title="Pause (p)"><i id="pause_button" class="bi-pause-fill" title="Pause (p)"></i></button>
+            <button onclick="save_state()" title="Save State"><i class="bi-download" title="Save State"></i></button>
+            <button onclick="load_state()" title="Load State"><i id="load_button" class="bi-upload" title="Load State"></i></button>
+            <button onclick="toggle_info()" title="Info"><i class="bi-info-circle" title="Info"></i></button>
         </div>
         <canvas id="nes_canvas" width="512" height="480"></canvas>
         <input id="rom_input" type="file" accept=".nes" />
