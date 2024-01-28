@@ -3,7 +3,7 @@ use std::sync::{
     Arc,
 };
 
-use anyhow::{Context, Result};
+use color_eyre::eyre::{ContextCompat, Result};
 use cpal::traits::*;
 use rtrb::chunks::ChunkError;
 

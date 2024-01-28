@@ -5,7 +5,7 @@ mod input;
 mod screen;
 
 use self::audio::{Audio, AudioPlayer};
-use anyhow::Result;
+use color_eyre::eyre::Result;
 use controller::Controller;
 use iced::{Application, Length};
 use screen::Screen;
@@ -44,6 +44,7 @@ impl iced::Application for App {
     type Executor = iced::executor::Default;
     type Flags = Flags;
     type Message = Message;
+    type Theme = iced::Theme;
 
     fn new(flags: Self::Flags) -> (Self, iced::Command<Self::Message>) {
         let (audio_player, nes_audio) = AudioPlayer::new().unwrap();
@@ -101,11 +102,11 @@ impl iced::Application for App {
         iced::Command::none()
     }
 
-    fn view(&mut self) -> iced::Element<'_, Self::Message> {
+    fn view(&self) -> iced::Element<'_, Self::Message> {
         let screen = self.nes.get_screen().get_frame();
         let pixels = Vec::from(&screen[..]);
 
-        let image = iced::Image::new(iced::image::Handle::from_pixels(
+        let image = iced::widget::Image::new(iced::widget::image::Handle::from_pixels(
             screen::SCREEN_WIDTH as u32,
             screen::SCREEN_HEIGHT as u32,
             pixels,
@@ -113,7 +114,7 @@ impl iced::Application for App {
         .height(Length::Fill)
         .width(Length::Fill);
 
-        iced::Container::new(image)
+        iced::widget::Container::new(image)
             .width(Length::Fill)
             .height(Length::Fill)
             .center_x()
@@ -123,9 +124,13 @@ impl iced::Application for App {
 
     fn subscription(&self) -> iced::Subscription<Self::Message> {
         iced::Subscription::batch([
-            iced_native::subscription::events_with(input::event_handler),
+            iced::subscription::events_with(input::event_handler),
             iced::time::every(std::time::Duration::from_micros(16667)).map(|_| Message::NextFrame),
         ])
+    }
+
+    fn theme(&self) -> Self::Theme {
+        iced::Theme::Dark
     }
 }
 
@@ -133,11 +138,11 @@ pub fn run(flags: Flags) -> Result<()> {
     App::run(iced::Settings {
         flags,
         antialiasing: true,
-        default_font: None,
-        default_text_size: 20,
+        default_text_size: 20.0,
         exit_on_close_request: true,
         window: iced::window::Settings {
             size: (256, 240),
+            resizable: true,
             ..Default::default()
         },
         ..Default::default()

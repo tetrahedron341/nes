@@ -8,10 +8,9 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-anyhow = "1.0.51"
 cpal = "0.13.4"
 nes_core = { path = "../nes_core" }
-iced = { git = "https://github.com/iced-rs/iced", rev = "e66a79", features = ["image", "tokio"] }
+iced = { version = "0.10", features = ["image", "tokio", "debug", "advanced"] }
 rtrb = "0.2.1"
-iced_native =  { git = "https://github.com/iced-rs/iced", rev="e66a79" }
 lazy_static = "1.4.0"
+color-eyre = "0.6.2"

@@ -30,16 +30,16 @@ lazy_static! {
 
 /// Handles keyboard events using a global input handler
 pub(super) fn event_handler(
-    event: iced_native::Event,
-    _status: iced_native::event::Status,
+    event: iced::Event,
+    _status: iced::event::Status,
 ) -> Option<super::Message> {
     match event {
-        iced_native::Event::Keyboard(event) => match event {
-            iced_native::keyboard::Event::KeyPressed { key_code, .. } => {
+        iced::Event::Keyboard(event) => match event {
+            iced::keyboard::Event::KeyPressed { key_code, .. } => {
                 let input = INPUT_HANDLER.read().unwrap().translate_keypresses(key_code);
                 input.and_then(Input::msg_on_press)
             }
-            iced_native::keyboard::Event::KeyReleased { key_code, .. } => {
+            iced::keyboard::Event::KeyReleased { key_code, .. } => {
                 let input = INPUT_HANDLER.read().unwrap().translate_keypresses(key_code);
                 input.and_then(Input::msg_on_release)
             }
