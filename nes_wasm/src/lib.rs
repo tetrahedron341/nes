@@ -67,7 +67,7 @@ enum Button {
 
 impl From<Button> for JsValue {
     fn from(val: Button) -> Self {
-        use Button::*;
+        use Button::{A, B, Down, Left, Right, Select, Start, Up};
         match val {
             A => "A".into(),
             B => "B".into(),
@@ -83,7 +83,7 @@ impl From<Button> for JsValue {
 
 impl From<Button> for ControllerState {
     fn from(val: Button) -> Self {
-        use Button::*;
+        use Button::{A, B, Down, Left, Right, Select, Start, Up};
         match val {
             A => ControllerState::A,
             B => ControllerState::B,
@@ -100,7 +100,7 @@ impl From<Button> for ControllerState {
 impl TryFrom<JsValue> for Button {
     type Error = JsValue;
     fn try_from(value: JsValue) -> Result<Self, Self::Error> {
-        use Button::*;
+        use Button::{A, B, Down, Left, Right, Select, Start, Up};
         let str = value.as_string().ok_or("Expected string")?;
         match str.to_lowercase().as_ref() {
             "a" => Ok(A),
@@ -162,7 +162,7 @@ pub struct Audio {}
 #[wasm_bindgen]
 impl Audio {
     #[wasm_bindgen(constructor)]
-    pub fn new() -> Self {
+    #[must_use] pub fn new() -> Self {
         Audio {}
     }
 }
@@ -203,13 +203,13 @@ pub fn init_emulator(audio: Audio) -> Result<Nes, JsValue> {
 
 #[wasm_bindgen]
 pub fn advance_frame(nes: &mut Nes) -> Result<(), JsValue> {
-    nes.0.run_frame().map_err(|e| format!("{}", e).into())
+    nes.0.run_frame().map_err(|e| format!("{e}").into())
 }
 
 #[wasm_bindgen]
 pub fn insert_cartridge(nes: &mut Nes, rom: Box<[u8]>) -> Result<(), JsValue> {
     let rom = rom.into_vec();
-    let cart = Cart::from_bytes(rom).map_err(|e| format!("{}", e))?;
+    let cart = Cart::from_bytes(rom).map_err(|e| format!("{e}"))?;
 
     nes.0.insert_cartridge(cart);
 

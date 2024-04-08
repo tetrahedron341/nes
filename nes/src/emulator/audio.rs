@@ -4,7 +4,7 @@ use std::sync::{
 };
 
 use color_eyre::eyre::{ContextCompat, Result};
-use cpal::traits::*;
+use cpal::traits::{DeviceTrait, HostTrait, StreamTrait};
 use rtrb::chunks::ChunkError;
 
 type CpalDataCallback =
@@ -39,7 +39,7 @@ impl AudioPlayer {
             let volume = volume.clone();
             let channels = config.channels as usize;
             Box::new(move |buffer, _out_info| {
-                let v = volume.load(Ordering::SeqCst) as f32 / 1000.0;
+                let v = f32::from(volume.load(Ordering::SeqCst)) / 1000.0;
                 let chunk = match c.read_chunk(buffer.len() / channels) {
                     Ok(chunk) => chunk,
                     Err(ChunkError::TooFewSlots(ready_samples)) => {

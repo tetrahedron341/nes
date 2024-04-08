@@ -30,12 +30,12 @@ fn run_blargg_test(rom: &'static [u8]) {
         }
     }
     println!();
-    println!("Test finished with code: {}", code);
+    println!("Test finished with code: {code}");
 
     assert_eq!(code, 0);
 }
 
 #[test]
 fn official_instructions() {
-    run_blargg_test(INSTRS_ROM)
+    run_blargg_test(INSTRS_ROM);
 }

@@ -381,49 +381,41 @@ impl MOS6502 {
             BCS => {
                 if self.P.contains(StatusRegister::C) {
                     self.PC.set(pointer.unwrap());
-                } else {
                 }
             }
             BCC => {
                 if !self.P.contains(StatusRegister::C) {
                     self.PC.set(pointer.unwrap());
-                } else {
                 }
             }
             BEQ => {
                 if self.P.contains(StatusRegister::Z) {
                     self.PC.set(pointer.unwrap());
-                } else {
                 }
             }
             BNE => {
                 if !self.P.contains(StatusRegister::Z) {
                     self.PC.set(pointer.unwrap());
-                } else {
                 }
             }
             BMI => {
                 if self.P.contains(StatusRegister::N) {
                     self.PC.set(pointer.unwrap());
-                } else {
                 }
             }
             BPL => {
                 if !self.P.contains(StatusRegister::N) {
                     self.PC.set(pointer.unwrap());
-                } else {
                 }
             }
             BVS => {
                 if self.P.contains(StatusRegister::V) {
                     self.PC.set(pointer.unwrap());
-                } else {
                 }
             }
             BVC => {
                 if !self.P.contains(StatusRegister::V) {
                     self.PC.set(pointer.unwrap());
-                } else {
                 }
             }
             INC => {

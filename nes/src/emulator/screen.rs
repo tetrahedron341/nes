@@ -24,7 +24,7 @@ impl Screen {
     }
 
     pub fn get_frame(&self) -> &NesFrame {
-        &*self.front
+        &self.front
     }
 }
 

@@ -1,3 +1,5 @@
+#![warn(clippy::perf, clippy::complexity)]
+#![deny(clippy::style)]
 #[macro_use]
 extern crate derive_more;
 

@@ -7,7 +7,7 @@ use std::sync::{Arc, RwLock};
 use crate::emulator::Message;
 
 const INPUTS_LIST: &[Input] = {
-    use Input::*;
+    use Input::{ButtonA, ButtonB, ButtonDown, ButtonLeft, ButtonRight, ButtonSelect, ButtonStart, ButtonUp, Pause, VolumeDown, VolumeUp};
     &[
         ButtonA,
         ButtonB,
@@ -67,7 +67,7 @@ pub enum Input {
 
 impl Input {
     fn msg_on_press(self) -> Option<super::Message> {
-        use Input::*;
+        use Input::{ButtonA, ButtonB, ButtonDown, ButtonLeft, ButtonRight, ButtonSelect, ButtonStart, ButtonUp, Pause, VolumeDown, VolumeUp};
 
         match self {
             ButtonA => Some(Message::ControllerButtonPressed(ControllerState::A)),
@@ -86,7 +86,7 @@ impl Input {
     }
 
     fn msg_on_release(self) -> Option<super::Message> {
-        use Input::*;
+        use Input::{ButtonA, ButtonB, ButtonDown, ButtonLeft, ButtonRight, ButtonSelect, ButtonStart, ButtonUp};
 
         match self {
             ButtonA => Some(Message::ControllerButtonReleased(ControllerState::A)),
@@ -122,7 +122,7 @@ impl InputHandler {
         };
 
         // Build up the reverse map from scratch
-        for (&input, &key) in s.forward_map.iter() {
+        for (&input, &key) in &s.forward_map {
             Self::reverse_map_bind(&mut s.reverse_map, input, key);
         }
 

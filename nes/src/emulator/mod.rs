@@ -58,7 +58,7 @@ impl iced::Application for App {
                 None,
             ),
             audio_player,
-            game_title: flags.rom_path.as_ref().cloned().unwrap_or_default(),
+            game_title: flags.rom_path.clone().unwrap_or_default(),
         };
 
         if let Some(rom_path) = flags.rom_path {
@@ -84,7 +84,7 @@ impl iced::Application for App {
         match message {
             Message::NextFrame => {
                 if self.state == AppState::Running {
-                    self.nes.run_frame().unwrap()
+                    self.nes.run_frame().unwrap();
                 }
             }
             Message::ControllerButtonPressed(b) => self.nes.get_controller_mut().buttons |= b,

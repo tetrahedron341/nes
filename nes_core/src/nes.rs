@@ -75,7 +75,7 @@ pub struct Nes<V: VideoInterface, C: NESController, A: AudioOutput> {
     _config: NESConfig,
 }
 
-impl<'a, V: VideoInterface, C: NESController, A: AudioOutput> Nes<V, C, A> {
+impl<V: VideoInterface, C: NESController, A: AudioOutput> Nes<V, C, A> {
     pub fn new<T: Into<Option<Cart>>>(
         cart: T,
         screen: V,
