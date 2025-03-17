@@ -67,7 +67,7 @@ enum Button {
 
 impl From<Button> for JsValue {
     fn from(val: Button) -> Self {
-        use Button::{A, B, Down, Left, Right, Select, Start, Up};
+        use Button::{Down, Left, Right, Select, Start, Up, A, B};
         match val {
             A => "A".into(),
             B => "B".into(),
@@ -83,7 +83,7 @@ impl From<Button> for JsValue {
 
 impl From<Button> for ControllerState {
     fn from(val: Button) -> Self {
-        use Button::{A, B, Down, Left, Right, Select, Start, Up};
+        use Button::{Down, Left, Right, Select, Start, Up, A, B};
         match val {
             A => ControllerState::A,
             B => ControllerState::B,
@@ -100,7 +100,7 @@ impl From<Button> for ControllerState {
 impl TryFrom<JsValue> for Button {
     type Error = JsValue;
     fn try_from(value: JsValue) -> Result<Self, Self::Error> {
-        use Button::{A, B, Down, Left, Right, Select, Start, Up};
+        use Button::{Down, Left, Right, Select, Start, Up, A, B};
         let str = value.as_string().ok_or("Expected string")?;
         match str.to_lowercase().as_ref() {
             "a" => Ok(A),
@@ -162,7 +162,8 @@ pub struct Audio {}
 #[wasm_bindgen]
 impl Audio {
     #[wasm_bindgen(constructor)]
-    #[must_use] pub fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Audio {}
     }
 }
